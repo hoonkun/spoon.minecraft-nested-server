@@ -1,18 +1,20 @@
 package kiwi.hoonkun.plugins.spoon
 
+import kiwi.hoonkun.plugins.spoon.server.SpoonApiServer
 import org.bukkit.plugin.java.JavaPlugin
-import java.util.logging.Level
 
 class Main: JavaPlugin() {
 
+    private val apiServer = SpoonApiServer(this)
+
     override fun onEnable() {
         super.onEnable()
-        server.logger.log(Level.INFO, "Enabled!")
+        apiServer.instance.start()
     }
 
     override fun onDisable() {
         super.onDisable()
-        server.logger.log(Level.INFO, "Disabled!!")
+        apiServer.instance.stop()
     }
 
 }
