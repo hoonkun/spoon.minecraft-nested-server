@@ -1,0 +1,4 @@
+name: spoon
+version: '0.0.0-IronIngot'
+main: kiwi.hoonkun.plugins.spoon.Main
+api-version: 1.19
