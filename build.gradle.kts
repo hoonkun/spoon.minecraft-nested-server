@@ -1,6 +1,7 @@
 plugins {
     java
     kotlin("jvm") version "1.8.0"
+    kotlin("plugin.serialization") version "1.8.0"
 }
 
 group = "kiwi.hoonkun.plugins"
@@ -18,13 +19,14 @@ repositories {
 }
 
 dependencies {
-    val ktor_version = "2.2.3"
+    val ktor_version = "2.0.1"
 
     testImplementation(kotlin("test"))
     implementation("io.papermc.paper:paper-api:1.19.3-R0.1-SNAPSHOT")
     implementation("io.ktor:ktor-server-core:$ktor_version")
+    implementation("io.ktor:ktor-server-auth:$ktor_version")
+    implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")
     implementation("io.ktor:ktor-server-netty:$ktor_version")
-    implementation("io.ktor:ktor-server-websockets-jvm:2.2.3")
     implementation("io.ktor:ktor-server-websockets:$ktor_version")
     implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
@@ -37,4 +39,11 @@ java {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.withType(Jar::class) {
+    from({
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+        configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
+    })
 }
