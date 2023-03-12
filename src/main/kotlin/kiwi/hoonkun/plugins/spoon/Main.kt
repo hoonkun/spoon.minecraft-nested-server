@@ -41,9 +41,8 @@ class Main : JavaPlugin() {
         sender: CommandSender,
         command: Command,
         label: String,
-        args: Array<out String>?
+        args: Array<out String>
     ): Boolean {
-        if (args == null) return true
         if (command.name != "spoon") return true
 
         if (args.isEmpty()) {
