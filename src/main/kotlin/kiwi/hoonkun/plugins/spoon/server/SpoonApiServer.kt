@@ -6,19 +6,20 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kiwi.hoonkun.plugins.spoon.Main
-import kiwi.hoonkun.plugins.spoon.server.auth.generateJWT
+import kiwi.hoonkun.plugins.spoon.server.auth.respondJWT
 
 
 fun Application.apiServer(parent: Main) {
     val prefix = "/api"
 
     routing {
-        post("/auth") { generateJWT(parent.configurations) }
+        post("/auth") { respondJWT(parent) }
         authenticate(optional = true) {
             get("$prefix/hello") {
                 val principal = call.principal<JWTPrincipal>()
                 if (principal != null) {
-                    call.respondText("Hello ${principal.payload.claims.getValue("username").asString()}, I'm spoon api server!")
+                    val username = principal.payload.claims.getValue("username").asString()
+                    call.respondText("Hello ${username}, I'm spoon api server!")
                 } else {
                     call.respondText("Hello, I'm spoon api server!")
                 }

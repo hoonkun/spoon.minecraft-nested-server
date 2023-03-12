@@ -22,7 +22,11 @@ dependencies {
     val ktor_version = "2.0.1"
 
     testImplementation(kotlin("test"))
+
     implementation("io.papermc.paper:paper-api:1.19.3-R0.1-SNAPSHOT")
+
+    implementation("at.favre.lib:bcrypt:0.10.2")
+
     implementation("io.ktor:ktor-server-core:$ktor_version")
     implementation("io.ktor:ktor-server-auth:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")
@@ -45,5 +49,7 @@ tasks.withType(Jar::class) {
     from({
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
         configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
-    })
+    }) {
+        exclude("META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA")
+    }
 }

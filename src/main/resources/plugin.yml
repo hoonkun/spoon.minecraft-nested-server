@@ -2,3 +2,11 @@ name: spoon
 version: '0.0.0-IronIngot'
 main: kiwi.hoonkun.plugins.spoon.Main
 api-version: 1.19
+commands:
+  spoon:
+    description: main spoon command.
+    permission: spoon.command
+permissions:
+  spoon.command:
+    description: allows spoon command
+    default: op
