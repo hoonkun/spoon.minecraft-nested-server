@@ -1,20 +1,29 @@
 package kiwi.hoonkun.plugins.spoon
 
-import kiwi.hoonkun.plugins.spoon.server.SpoonApiServer
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import kiwi.hoonkun.plugins.spoon.server.apiServer
+import kiwi.hoonkun.plugins.spoon.server.websocketServer
 import org.bukkit.plugin.java.JavaPlugin
 
 class Main: JavaPlugin() {
 
-    private val apiServer = SpoonApiServer(this)
+    private val spoon = embeddedServer(Netty, port = 25566, module = { spoon(this@Main) })
 
     override fun onEnable() {
         super.onEnable()
-        apiServer.instance.start()
+        spoon.start()
     }
 
     override fun onDisable() {
         super.onDisable()
-        apiServer.instance.stop()
+        spoon.stop()
     }
 
+}
+
+fun Application.spoon(parent: Main) {
+    apiServer(parent)
+    websocketServer(parent)
 }
