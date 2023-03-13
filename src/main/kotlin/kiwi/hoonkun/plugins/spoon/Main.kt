@@ -25,6 +25,7 @@ import java.io.File
 class Main : JavaPlugin() {
 
     val configurations = parseConfiguration(File("${dataFolder.absolutePath}/.config.env"))
+    val resources = parseResources()
     val users = parseUser(File("${dataFolder.absolutePath}/.user.json")).toMutableList()
 
     val logs = mutableListOf<SpoonLog>()
@@ -95,6 +96,17 @@ fun parseConfiguration(configFile: File): SpoonConfiguration {
     return SpoonConfiguration(
         secret = dict.getValue("secret"),
         host = "http://${dict.getValue("host")}:25566"
+    )
+}
+
+data class SpoonResources(
+    val blockColors: Map<String, String?>
+)
+fun parseResources(): SpoonResources {
+    val colorResource = {}::class.java.getResource("/block_colors.json")
+
+    return SpoonResources(
+        Json.decodeFromString(colorResource?.readText() ?: "{}")
     )
 }
 
