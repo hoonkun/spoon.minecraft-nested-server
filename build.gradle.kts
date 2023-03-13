@@ -27,6 +27,9 @@ dependencies {
 
     implementation("at.favre.lib:bcrypt:0.10.2")
 
+    implementation("org.apache.logging.log4j:log4j-api:2.17.2")
+    implementation("org.apache.logging.log4j:log4j-core:2.17.2")
+
     implementation("io.ktor:ktor-server-core:$ktor_version")
     implementation("io.ktor:ktor-server-auth:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")

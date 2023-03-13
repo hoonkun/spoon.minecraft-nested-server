@@ -5,13 +5,17 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
+import kiwi.hoonkun.plugins.spoon.plugin.ConsoleFilter
 import kiwi.hoonkun.plugins.spoon.plugin.commands.UserExecutor
+import kiwi.hoonkun.plugins.spoon.server.SpoonLog
 import kiwi.hoonkun.plugins.spoon.server.apiServer
 import kiwi.hoonkun.plugins.spoon.server.auth.jwtAuthentication
 import kiwi.hoonkun.plugins.spoon.server.structures.User
 import kiwi.hoonkun.plugins.spoon.server.websocketServer
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.core.Logger
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.plugin.java.JavaPlugin
@@ -23,12 +27,16 @@ class Main : JavaPlugin() {
     val configurations = parseConfiguration(File("${dataFolder.absolutePath}/.config.env"))
     val users = parseUser(File("${dataFolder.absolutePath}/.user.json")).toMutableList()
 
+    val logs = mutableListOf<SpoonLog>()
+
     private val spoon = embeddedServer(Netty, port = 25566, module = { spoon(this@Main) })
 
     private val userExecutor = UserExecutor(this)
 
     override fun onEnable() {
         super.onEnable()
+        registerLoggerHandlers()
+
         spoon.start()
     }
 
@@ -55,6 +63,10 @@ class Main : JavaPlugin() {
             "user" -> userExecutor.exec(sender, nextArgs)
             else -> true
         }
+    }
+
+    private fun registerLoggerHandlers() {
+        (LogManager.getRootLogger() as Logger).addFilter(ConsoleFilter(this))
     }
 
 }

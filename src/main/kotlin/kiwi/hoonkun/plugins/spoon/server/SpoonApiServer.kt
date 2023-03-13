@@ -26,6 +26,7 @@ fun Application.apiServer(parent: Main) {
         }
         authenticate {
             post("$prefix/run") { runCommand(parent) }
+            get("$prefix/logs") { logs(parent) }
         }
     }
 }
@@ -60,4 +61,10 @@ suspend fun PipelineContext<Unit, ApplicationCall>.runCommand(parent: Main) {
         parent.server.dispatchCommand(parent.server.consoleSender, data.command)
     })
     call.respond(HttpStatusCode.OK)
+}
+
+@Serializable
+data class SpoonLog(val time: Long, val message: String)
+suspend fun PipelineContext<Unit, ApplicationCall>.logs(parent: Main) {
+    call.respond(parent.logs)
 }
