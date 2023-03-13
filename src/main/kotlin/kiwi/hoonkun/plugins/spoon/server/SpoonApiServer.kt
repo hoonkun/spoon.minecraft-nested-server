@@ -13,9 +13,13 @@ import kiwi.hoonkun.plugins.spoon.extensions.forEach
 import kiwi.hoonkun.plugins.spoon.server.auth.respondJWT
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonCommonPlayer
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.bukkit.HeightMap
 import org.bukkit.World.Environment
+import java.io.ByteArrayOutputStream
+import javax.imageio.ImageIO
 
 
 fun Application.apiServer(parent: Main) {
@@ -26,6 +30,7 @@ fun Application.apiServer(parent: Main) {
         authenticate(optional = true) {
             get("$prefix/hello") { hello() }
             get("$prefix/connected-users") { connectedUsers(parent) }
+            get("$prefix/connected-user-graphic/{userId}") { userSkin(parent) }
         }
         authenticate {
             post("$prefix/run") { runCommand(parent) }
@@ -71,6 +76,40 @@ suspend fun PipelineContext<Unit, ApplicationCall>.runCommand(parent: Main) {
 data class SpoonLog(val time: Long, val message: String)
 suspend fun PipelineContext<Unit, ApplicationCall>.logs(parent: Main) {
     call.respond(parent.logs)
+}
+
+suspend fun PipelineContext<Unit, ApplicationCall>.userSkin(parent: Main) {
+    val userId = call.parameters["userId"]
+
+    if (userId.isNullOrEmpty()) {
+        call.respond(HttpStatusCode.BadRequest, "no userId passed to url.")
+        return
+    }
+
+    val player = parent.server.onlinePlayers.find { it.playerProfile.uniqueId.toString() == userId }
+    if (player == null) {
+        call.respond(HttpStatusCode.NotFound, "no online player with given id found from server")
+        return
+    }
+
+    val skin = player.playerProfile.textures.skin
+    if (skin == null) {
+        call.respond(HttpStatusCode.NotFound, "no skin data found from server")
+        return
+    }
+
+    val bytes = withContext(Dispatchers.IO) {
+        val image = ImageIO.read(skin)
+
+        val face = image.getSubimage(8, 8, 8, 8)
+
+        val outputStream = ByteArrayOutputStream()
+        ImageIO.write(face, "png", outputStream)
+
+        outputStream.toByteArray()
+    }
+
+    call.respondBytes(bytes, ContentType.Image.PNG)
 }
 
 @Serializable

@@ -19,6 +19,7 @@ data class SpoonLocation(
 
 @Serializable
 data class SpoonPlayer(
+    val userId: String,
     val name: String,
     val texture: String?,
     val gameMode: String,
@@ -30,6 +31,7 @@ data class SpoonPlayer(
     companion object {
         fun bukkit(it: Player): SpoonPlayer =
             SpoonPlayer(
+                userId = it.playerProfile.uniqueId.toString(),
                 name = it.name, gameMode = it.gameMode.name, health = it.health, level = it.level, exp = it.exp,
                 texture = it.playerProfile.textures.skin?.toExternalForm(),
                 location = SpoonLocation.bukkit(it.location)
