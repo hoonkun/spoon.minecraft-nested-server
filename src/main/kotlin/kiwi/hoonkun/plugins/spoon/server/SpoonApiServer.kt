@@ -115,9 +115,11 @@ suspend fun PipelineContext<Unit, ApplicationCall>.userSkin(parent: Main) {
 @Serializable
 data class TerrainRequestLocation(val x: Int, val z: Int)
 @Serializable
-data class TerrainRequest(val environment: String, val location: TerrainRequestLocation)
+data class TerrainRequest(val environment: String, val locations: List<TerrainRequestLocation>, val limit: Int? = null)
 @Serializable
-data class TerrainResponse(val palette: List<String>, val colors: List<String?>, val blocks: List<Long>)
+data class TerrainChunk(val location: TerrainRequestLocation, val blocks: List<Long>, val limited: List<Long>)
+@Serializable
+data class TerrainResponse(val chunks: List<TerrainChunk>, val palette: List<String>, val colors: List<String?>)
 suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
     val data = call.receive<TerrainRequest>()
     val environment =
@@ -149,42 +151,100 @@ suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
         result
     }
 
-    val minX = (data.location.x - 1) * 16
-    val maxX = (data.location.x + 1) * 16
-    val minZ = (data.location.z - 1) * 16
-    val maxZ = (data.location.z + 1) * 16
+    val blockKeysByChunk = mutableMapOf<TerrainRequestLocation, MutableList<String>>()
+    val blockLongsByChunk = mutableMapOf<TerrainRequestLocation, MutableList<Long>>()
+    val yLimitedLongsByChunk = mutableMapOf<TerrainRequestLocation, MutableList<Long>>()
 
-    val blocks = mutableListOf<String>()
+    data.locations.forEach { location ->
+        val blockKeys = mutableListOf<String>()
 
-    var blockSegmentIndex = 0
-    var blockSegment: Long = 0
+        var yLimitedDataBits = 0L
+        var yLimitedDataBitIndex = 0
+        val yLimitedLongs = mutableListOf<Long>()
 
-    ((minX until maxX) to (minZ until maxZ)).forEach { x, z ->
-        blocks.add(world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING).type.key.key)
-    }
-
-    val palette = blocks.toSet()
-    val bitsPerBlock = calcBitsPerBlock(palette.size)
-
-    val longs = mutableListOf<Long>()
-
-    blocks.forEach { block ->
-        val paletteIndex = palette.indexOf(block).toLong()
-
-        blockSegmentIndex++
-        blockSegment = blockSegment or paletteIndex
-        blockSegment = blockSegment shl bitsPerBlock
-
-        if ((blockSegmentIndex + 1) * bitsPerBlock > Long.SIZE_BITS) {
-            longs.add(blockSegment)
-            blockSegment = 0
-            blockSegmentIndex = 0
+        val setYLimited = {
+            yLimitedDataBits = yLimitedDataBits or 1L
+            yLimitedDataBits = yLimitedDataBits shl 1
         }
-    }
-    if (blockSegment != 0L) longs.add(blockSegment)
 
-    val orderedPalette = palette.toList()
+        val setYNotLimited = {
+            yLimitedDataBits = yLimitedDataBits shl 1
+        }
+
+        ((location.x * 16 until (location.x + 1) * 16) to (location.z * 16 until (location.z + 1) * 16)).forEach block@ { x, z ->
+            val highest = world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING)
+
+            val limit = data.limit
+            if (limit == null) {
+                blockKeys.add(highest.type.key.key)
+                return@block
+            }
+
+            if (yLimitedDataBitIndex == Long.SIZE_BITS) {
+                yLimitedLongs.add(yLimitedDataBits)
+                yLimitedDataBits = 0L
+                yLimitedDataBitIndex = 0
+            }
+
+            if (highest.y < limit) {
+                blockKeys.add(highest.type.key.key)
+                setYNotLimited()
+            } else {
+                var block = world.getBlockAt(x, limit, z)
+
+                if (block.type.isSolid) setYLimited()
+                else setYNotLimited()
+
+                while (!block.type.isSolid) {
+                    block = world.getBlockAt(x, block.y - 1, z)
+                }
+
+                blockKeys.add(block.type.key.key)
+            }
+
+            yLimitedDataBitIndex++
+        }
+
+        if (data.limit != null) yLimitedLongs.add(yLimitedDataBits)
+
+        blockKeysByChunk[location] = blockKeys
+        yLimitedLongsByChunk[location] = yLimitedLongs
+    }
+
+    val palette = blockKeysByChunk.values.flatten().toSet().toList()
     val colors = palette.map { parent.resources.blockColors[it] }
 
-    call.respond(TerrainResponse(orderedPalette, colors, longs))
+    val bitsPerBlock = calcBitsPerBlock(palette.size)
+
+    blockKeysByChunk.forEach { (location, keys) ->
+        var blockDataBitIndex = 0
+        var blockDataBits: Long = 0
+        val blockLongs = mutableListOf<Long>()
+
+        keys.forEach { key ->
+            val paletteIndex = palette.indexOf(key).toLong()
+
+            blockDataBitIndex++
+            blockDataBits = blockDataBits or paletteIndex
+            blockDataBits = blockDataBits shl bitsPerBlock
+
+            if ((blockDataBitIndex + 1) * bitsPerBlock > Long.SIZE_BITS) {
+                blockLongs.add(blockDataBits)
+                blockDataBits = 0
+                blockDataBitIndex = 0
+            }
+        }
+
+        if (blockDataBits != 0L) blockLongs.add(blockDataBits)
+
+        blockLongsByChunk[location] = blockLongs
+    }
+
+    call.respond(
+        TerrainResponse(
+            data.locations.map { TerrainChunk(it, blockLongsByChunk.getValue(it), yLimitedLongsByChunk.getValue(it)) },
+            palette,
+            colors
+        )
+    )
 }
