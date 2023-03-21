@@ -221,6 +221,8 @@ suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
         var blockDataBits: Long = 0
         val blockLongs = mutableListOf<Long>()
 
+        var hasRemainingBlockData = false
+
         keys.forEach { key ->
             val paletteIndex = palette.indexOf(key).toLong()
 
@@ -228,14 +230,17 @@ suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
             blockDataBits = blockDataBits or paletteIndex
             blockDataBits = blockDataBits shl bitsPerBlock
 
+            hasRemainingBlockData = true
+
             if ((blockDataBitIndex + 1) * bitsPerBlock > Long.SIZE_BITS) {
                 blockLongs.add(blockDataBits)
                 blockDataBits = 0
                 blockDataBitIndex = 0
+                hasRemainingBlockData = false
             }
         }
 
-        if (blockDataBits != 0L) blockLongs.add(blockDataBits)
+        if (hasRemainingBlockData) blockLongs.add(blockDataBits)
 
         blockLongsByChunk[location] = blockLongs
     }
