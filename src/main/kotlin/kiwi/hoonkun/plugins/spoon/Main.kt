@@ -7,6 +7,8 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import kiwi.hoonkun.plugins.spoon.plugin.ConsoleFilter
 import kiwi.hoonkun.plugins.spoon.plugin.commands.UserExecutor
+import kiwi.hoonkun.plugins.spoon.plugin.listeners.LiveDataObserver
+import kiwi.hoonkun.plugins.spoon.server.Connection
 import kiwi.hoonkun.plugins.spoon.server.SpoonLog
 import kiwi.hoonkun.plugins.spoon.server.apiServer
 import kiwi.hoonkun.plugins.spoon.server.auth.jwtAuthentication
@@ -20,6 +22,8 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
+import java.util.*
+import kotlin.collections.LinkedHashSet
 
 
 class Main : JavaPlugin() {
@@ -31,6 +35,7 @@ class Main : JavaPlugin() {
     val logs = mutableListOf<SpoonLog>()
 
     private val spoon = embeddedServer(Netty, port = 25566, module = { spoon(this@Main) })
+    val spoonSocketConnections: MutableSet<Connection> = Collections.synchronizedSet(LinkedHashSet())
 
     private val userExecutor = UserExecutor(this)
 
@@ -39,6 +44,8 @@ class Main : JavaPlugin() {
         registerLoggerHandlers()
 
         spoon.start()
+
+        server.pluginManager.registerEvents(LiveDataObserver(this), this)
     }
 
     override fun onDisable() {
