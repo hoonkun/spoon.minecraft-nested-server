@@ -41,6 +41,7 @@ data class SpoonPlayer(
 
 @Serializable
 data class SpoonCommonPlayer(
+    val userId: String,
     val name: String,
     val texture: String?,
     val gameMode: String
@@ -48,7 +49,7 @@ data class SpoonCommonPlayer(
     companion object {
         fun bukkit(it: Player): SpoonCommonPlayer =
             SpoonCommonPlayer(
-                name = it.name, gameMode = it.gameMode.name,
+                userId = it.playerProfile.uniqueId.toString(), name = it.name, gameMode = it.gameMode.name,
                 texture = it.playerProfile.textures.skin?.toExternalForm()
             )
     }
