@@ -1,10 +1,12 @@
 package kiwi.hoonkun.plugins.spoon
 
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
 import kiwi.hoonkun.plugins.spoon.plugin.ConsoleFilter
 import kiwi.hoonkun.plugins.spoon.plugin.commands.UserExecutor
 import kiwi.hoonkun.plugins.spoon.plugin.listeners.LiveDataObserver
@@ -81,6 +83,25 @@ class Main : JavaPlugin() {
 
 fun Application.spoon(parent: Main) {
     install(ContentNegotiation) { json() }
+    install(CORS) {
+        methods.addAll(
+            listOf(
+                HttpMethod.Options,
+                HttpMethod.Put,
+                HttpMethod.Delete,
+                HttpMethod.Patch,
+                HttpMethod.Get,
+                HttpMethod.Post,
+                HttpMethod.Head
+            )
+        )
+        headers.addAll(listOf(HttpHeaders.Authorization, HttpHeaders.AccessControlAllowOrigin))
+        allowNonSimpleContentTypes = true
+        allowCredentials = true
+        allowSameOrigin = true
+        anyHost() // FIXME: 언젠가 수정합시다 이거
+    }
+
     jwtAuthentication(parent.configurations)
 
     apiServer(parent)
