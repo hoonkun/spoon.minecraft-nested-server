@@ -28,13 +28,14 @@ fun Application.apiServer(parent: Main) {
     routing {
         post("/auth") { respondJWT(parent) }
         authenticate(optional = true) {
+            get("/me") { call.respond(call.principal<JWTPrincipal>()!!.payload.claims.getValue("username").asString()) }
             get("$prefix/hello") { hello() }
             get("$prefix/connected-users") { connectedUsers(parent) }
             get("$prefix/connected-user-graphic/{userId}") { userSkin(parent) }
         }
         authenticate {
             post("$prefix/run") { runCommand(parent) }
-            get("$prefix/terrain") { terrain(parent) }
+            post("$prefix/terrain") { terrain(parent) }
             get("$prefix/logs") { logs(parent) }
         }
     }
