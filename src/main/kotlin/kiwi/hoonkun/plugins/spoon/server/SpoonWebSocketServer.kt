@@ -27,13 +27,13 @@ class LiveDataType {
 }
 
 @Serializable
-data class SocketInitializeResponse(val identifier: String)
+data class SocketInitializeResponse(val type: String, val identifier: String)
 
 @Serializable
 data class LiveDataSubscribeRequest(val which: String, val operation: String)
 
 @Serializable
-data class PlayerMoveData(val playerId: String, val x: Double, val y: Double, val z: Double)
+data class PlayerMoveData(val type: String, val playerId: String, val x: Double, val y: Double, val z: Double)
 
 fun Application.websocketServer(parent: Main) {
     install(WebSockets) {
@@ -50,7 +50,7 @@ fun Application.websocketServer(parent: Main) {
             parent.spoonSocketConnections += thisConnection
 
             try {
-                sendSerialized(SocketInitializeResponse(thisConnection.name))
+                sendSerialized(SocketInitializeResponse("Connected", thisConnection.name))
                 for (frame in incoming) {
                     frame as? Frame.Text ?: continue
                     val request = Json.decodeFromString<LiveDataSubscribeRequest>(frame.readText())

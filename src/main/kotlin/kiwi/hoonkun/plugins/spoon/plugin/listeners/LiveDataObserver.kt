@@ -25,9 +25,15 @@ class LiveDataObserver(private val parent: Main): Listener {
     fun onPlayerMove(event: PlayerMoveEvent) {
         val current = System.currentTimeMillis()
         val playerUID = event.player.uniqueId.toString()
-        if (current - (delays.onPlayerMove[playerUID] ?: 0) < 1000) return
+        if (current - (delays.onPlayerMove[playerUID] ?: 0) < 150) return
 
-        val data = PlayerMoveData(playerUID, event.player.location.x, event.player.location.y, event.player.location.z)
+        val data = PlayerMoveData(
+            type = "PlayerMove",
+            playerId = playerUID,
+            x = event.player.location.x,
+            y = event.player.location.y,
+            z = event.player.location.z
+        )
 
         delays.onPlayerMove[playerUID] = current
 
