@@ -6,6 +6,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kiwi.hoonkun.plugins.spoon.Main
+import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -18,11 +19,31 @@ class Connection(val session: DefaultWebSocketServerSession) {
     }
     val name = "observer-${lastId.getAndIncrement()}"
     val subscribed = mutableSetOf<String>()
+
+    suspend fun init(parent: Main, which: String) {
+        when (which) {
+            LiveDataType.PlayerMove -> {
+                parent.server.onlinePlayers.forEach {
+                    session.sendSerialized(
+                        PlayerMoveData(
+                            type = LiveDataType.PlayerMove,
+                            playerId = it.playerProfile.uniqueId.toString(),
+                            x = it.location.x,
+                            y = it.location.y,
+                            z = it.location.z,
+                        )
+                    )
+                }
+            }
+        }
+    }
 }
 
 class LiveDataType {
     companion object {
         const val PlayerMove = "PlayerMove"
+        const val PlayerConnect = "PlayerConnect"
+        const val PlayerDisconnect = "PlayerDisconnect"
     }
 }
 
@@ -34,6 +55,12 @@ data class LiveDataSubscribeRequest(val which: String, val operation: String)
 
 @Serializable
 data class PlayerMoveData(val type: String, val playerId: String, val x: Double, val y: Double, val z: Double)
+
+@Serializable
+data class PlayerConnectData(val type: String, val player: SpoonPlayer)
+
+@Serializable
+data class PlayerDisconnectData(val type: String, val playerId: String)
 
 fun Application.websocketServer(parent: Main) {
     install(WebSockets) {
@@ -54,10 +81,16 @@ fun Application.websocketServer(parent: Main) {
                 for (frame in incoming) {
                     frame as? Frame.Text ?: continue
                     val request = Json.decodeFromString<LiveDataSubscribeRequest>(frame.readText())
-                    if (request.operation == "subscribe") {
-                        thisConnection.subscribed.add(request.which)
-                    } else {
-                        thisConnection.subscribed.remove(request.which)
+                    when (request.operation) {
+                        "subscribe" -> {
+                            thisConnection.subscribed.add(request.which)
+                        }
+                        "unsubscribe" -> {
+                            thisConnection.subscribed.remove(request.which)
+                        }
+                        "initial_data_request" -> {
+                            thisConnection.init(parent, request.which)
+                        }
                     }
                 }
             } catch (e: Exception) {
