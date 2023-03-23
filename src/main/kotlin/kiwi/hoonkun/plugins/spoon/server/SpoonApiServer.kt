@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.bukkit.HeightMap
 import org.bukkit.World.Environment
+import org.bukkit.block.Block
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
@@ -116,11 +117,11 @@ suspend fun PipelineContext<Unit, ApplicationCall>.userSkin(parent: Main) {
 @Serializable
 data class TerrainRequestLocation(val x: Int, val z: Int)
 @Serializable
-data class TerrainRequest(val environment: String, val locations: List<TerrainRequestLocation>, val limit: Int? = null)
+data class TerrainRequest(val environment: String, val center: TerrainRequestLocation, val scale: Int, val limit: Int? = null)
 @Serializable
-data class TerrainChunk(val location: TerrainRequestLocation, val blocks: List<Long>, val limited: List<Long>)
+data class TerrainData(val limited: List<Long>, val blocks: List<Long>, val shadows: List<Long>)
 @Serializable
-data class TerrainResponse(val chunks: List<TerrainChunk>, val palette: List<String>, val colors: List<String?>)
+data class TerrainResponse(val terrain: TerrainData, val palette: List<String>, val colors: List<String?>)
 suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
     val data = call.receive<TerrainRequest>()
     val environment =
@@ -152,103 +153,150 @@ suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
         result
     }
 
-    val blockKeysByChunk = mutableMapOf<TerrainRequestLocation, MutableList<String>>()
-    val blockLongsByChunk = mutableMapOf<TerrainRequestLocation, MutableList<Long>>()
-    val yLimitedLongsByChunk = mutableMapOf<TerrainRequestLocation, MutableList<Long>>()
+    val radius = data.scale / 2
+    val fromX = (data.center.x - radius) * 16
+    val toX = (data.center.x + radius + 1) * 16
+    val fromZ = (data.center.z - radius) * 16
+    val toZ = (data.center.z + radius + 1) * 16
 
-    data.locations.forEach { location ->
-        val blockKeys = mutableListOf<String>()
+    val blockKeys = mutableListOf<String>()
+    val blockYs = mutableListOf<Int>()
 
-        var yLimitedDataBits = 0L
-        var yLimitedDataBitIndex = 0
-        val yLimitedLongs = mutableListOf<Long>()
+    val blockLongs = mutableListOf<Long>()
+    val yLimitedLongs = mutableListOf<Long>()
+    val shadowLongs = mutableListOf<Long>()
 
-        val setYLimited = {
-            yLimitedDataBits = yLimitedDataBits or 1L
-            yLimitedDataBits = yLimitedDataBits shl 1
-        }
+    var yLimitedDataBits = 0L
+    var yLimitedDataBitIndex = 0
 
-        val setYNotLimited = {
-            yLimitedDataBits = yLimitedDataBits shl 1
-        }
-
-        ((location.x * 16 until (location.x + 1) * 16) to (location.z * 16 until (location.z + 1) * 16)).forEach block@ { x, z ->
-            val highest = world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING)
-
-            val limit = data.limit
-            if (limit == null) {
-                blockKeys.add(highest.type.key.key)
-                return@block
-            }
-
-            if (yLimitedDataBitIndex == Long.SIZE_BITS) {
-                yLimitedLongs.add(yLimitedDataBits)
-                yLimitedDataBits = 0L
-                yLimitedDataBitIndex = 0
-            }
-
-            if (highest.y < limit) {
-                blockKeys.add(highest.type.key.key)
-                setYNotLimited()
-            } else {
-                var block = world.getBlockAt(x, limit, z)
-
-                if (block.type.isSolid) setYLimited()
-                else setYNotLimited()
-
-                while (!block.type.isSolid) {
-                    block = world.getBlockAt(x, block.y - 1, z)
-                }
-
-                blockKeys.add(block.type.key.key)
-            }
-
-            yLimitedDataBitIndex++
-        }
-
-        if (data.limit != null) yLimitedLongs.add(yLimitedDataBits)
-
-        blockKeysByChunk[location] = blockKeys
-        yLimitedLongsByChunk[location] = yLimitedLongs
+    val setYLimited = {
+        yLimitedDataBits = yLimitedDataBits shl 1
+        yLimitedDataBits = yLimitedDataBits or 1L
     }
 
-    val palette = blockKeysByChunk.values.flatten().toSet().toList()
+    val setYNotLimited = {
+        yLimitedDataBits = yLimitedDataBits shl 1
+    }
+
+    var hasRemainingYLimitedData = false
+
+    ((fromX until toX) to (fromZ until toZ)).forEach block@ { x, z ->
+        val highest = world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING)
+
+        val addBlockY: (Block) -> Unit = {
+            if (it.type.key.key == "water") blockYs.add(world.getHighestBlockAt(x, z, HeightMap.OCEAN_FLOOR).y)
+            else blockYs.add(it.y)
+        }
+
+        val limit = data.limit
+        if (limit == null) {
+            blockKeys.add(highest.type.key.key)
+            addBlockY(highest)
+            return@block
+        }
+
+        if (highest.y < limit) {
+            blockKeys.add(highest.type.key.key)
+            addBlockY(highest)
+            setYNotLimited()
+        } else {
+            var block = world.getBlockAt(x, limit, z)
+
+            if (block.type.isSolid) setYLimited()
+            else setYNotLimited()
+
+            while (!block.type.isSolid) {
+                block = world.getBlockAt(x, block.y - 1, z)
+            }
+
+            blockKeys.add(block.type.key.key)
+            addBlockY(block)
+        }
+
+        hasRemainingYLimitedData = true
+        yLimitedDataBitIndex++
+
+        if (yLimitedDataBitIndex == Int.SIZE_BITS) {
+            yLimitedLongs.add(yLimitedDataBits)
+            yLimitedDataBits = 0L
+            yLimitedDataBitIndex = 0
+            hasRemainingYLimitedData = false
+        }
+    }
+
+    if (hasRemainingYLimitedData) yLimitedLongs.add(yLimitedDataBits)
+
+    val palette = blockKeys.toSet().toList()
     val colors = palette.map { parent.resources.blockColors[it] }
 
     val bitsPerBlock = calcBitsPerBlock(palette.size)
 
-    blockKeysByChunk.forEach { (location, keys) ->
-        var blockDataBitIndex = 0
-        var blockDataBits: Long = 0
-        val blockLongs = mutableListOf<Long>()
+    var blockDataBitIndex = 0
+    var blockDataBits: Long = 0
 
-        var hasRemainingBlockData = false
+    var hasRemainingBlockData = false
 
-        keys.forEach { key ->
-            val paletteIndex = palette.indexOf(key).toLong()
+    blockKeys.forEach { key ->
+        val paletteIndex = palette.indexOf(key).toLong()
 
-            blockDataBitIndex++
-            blockDataBits = blockDataBits or paletteIndex
-            blockDataBits = blockDataBits shl bitsPerBlock
+        blockDataBits = blockDataBits shl bitsPerBlock
+        blockDataBits = blockDataBits or paletteIndex
 
-            hasRemainingBlockData = true
+        blockDataBitIndex += bitsPerBlock
 
-            if ((blockDataBitIndex + 1) * bitsPerBlock > Long.SIZE_BITS) {
-                blockLongs.add(blockDataBits)
-                blockDataBits = 0
-                blockDataBitIndex = 0
-                hasRemainingBlockData = false
-            }
+        hasRemainingBlockData = true
+
+        if (blockDataBitIndex + bitsPerBlock > Int.SIZE_BITS) {
+            blockLongs.add(blockDataBits)
+            blockDataBits = 0
+            blockDataBitIndex = 0
+            hasRemainingBlockData = false
         }
-
-        if (hasRemainingBlockData) blockLongs.add(blockDataBits)
-
-        blockLongsByChunk[location] = blockLongs
     }
+
+    if (hasRemainingBlockData) blockLongs.add(blockDataBits)
+
+    var shadowDataBits = 0L
+    var shadowDataBitIndex = 0
+
+    var hasRemainingShadowData = false
+
+    val setBlockShadowed = {
+        shadowDataBits = shadowDataBits shl 2
+        shadowDataBits = shadowDataBits or 1
+    }
+
+    val setBlockLighted = {
+        shadowDataBits = shadowDataBits shl 2
+        shadowDataBits = shadowDataBits or 2
+    }
+
+    val setBlockNotShadowed = {
+        shadowDataBits = shadowDataBits shl 2
+    }
+
+    blockYs.forEachIndexed blockY@ { index, it ->
+        val aboveYIndex = if (index % (16 * data.scale) == 0) -1 else index - 1
+        if (aboveYIndex < 0 || blockYs[aboveYIndex] > it) setBlockShadowed()
+        else if (blockYs[aboveYIndex] < it) setBlockLighted()
+        else setBlockNotShadowed()
+
+        shadowDataBitIndex += 2
+        hasRemainingShadowData = true
+
+        if (shadowDataBitIndex == Int.SIZE_BITS) {
+            shadowLongs.add(shadowDataBits)
+            shadowDataBitIndex = 0
+            shadowDataBits = 0
+            hasRemainingShadowData = false
+        }
+    }
+
+    if (hasRemainingShadowData) shadowLongs.add(shadowDataBits)
 
     call.respond(
         TerrainResponse(
-            data.locations.map { TerrainChunk(it, blockLongsByChunk.getValue(it), yLimitedLongsByChunk.getValue(it)) },
+            TerrainData(yLimitedLongs, blockLongs, shadowLongs),
             palette,
             colors
         )
