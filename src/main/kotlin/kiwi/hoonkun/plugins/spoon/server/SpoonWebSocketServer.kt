@@ -7,6 +7,7 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kiwi.hoonkun.plugins.spoon.Main
 import kiwi.hoonkun.plugins.spoon.extensions.spoon
+import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOfflinePlayer
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -78,7 +79,7 @@ data class PlayerMoveData(val type: String, val playerId: String, val x: Double,
 data class PlayerConnectData(val type: String, val player: SpoonOnlinePlayer)
 
 @Serializable
-data class PlayerDisconnectData(val type: String, val playerId: String)
+data class PlayerDisconnectData(val type: String, val player: SpoonOfflinePlayer)
 
 @Serializable
 data class DaylightCycleData(val type: String, val time: Long)

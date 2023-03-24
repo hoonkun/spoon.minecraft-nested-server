@@ -7,6 +7,7 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kiwi.hoonkun.plugins.spoon.Main
 import kiwi.hoonkun.plugins.spoon.extensions.forEach
@@ -16,10 +17,15 @@ import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.bukkit.HeightMap
 import org.bukkit.World.Environment
 import org.bukkit.block.Block
+import java.io.BufferedReader
 import java.io.ByteArrayOutputStream
+import java.io.InputStreamReader
+import java.net.URL
 import javax.imageio.ImageIO
 
 
@@ -87,13 +93,33 @@ suspend fun PipelineContext<Unit, ApplicationCall>.userSkin(parent: Main) {
         return
     }
 
-    val player = parent.server.onlinePlayers.find { it.playerProfile.uniqueId.toString() == userId }
-    if (player == null) {
-        call.respond(HttpStatusCode.NotFound, "no online player with given id found from server")
+    val onlinePlayer = parent.server.onlinePlayers.find { it.playerProfile.uniqueId.toString() == userId }
+    val offlinePlayer = parent.server.offlinePlayers.find { it.playerProfile.uniqueId.toString() == userId }
+
+    if (onlinePlayer == null && offlinePlayer == null) {
+        call.respond(HttpStatusCode.NotFound, "no player found with given id from server")
         return
     }
 
-    val skin = player.playerProfile.textures.skin
+    val skin = if (onlinePlayer != null) {
+        onlinePlayer.playerProfile.textures.skin
+    } else {
+        withContext(Dispatchers.IO) {
+            try {
+                val url = URL("https://sessionserver.mojang.com/session/minecraft/profile/$userId")
+                val connection = url.openConnection()
+                val content =
+                    BufferedReader(InputStreamReader(connection.getInputStream())).use { reader -> reader.readText() }
+                val response = Json.decodeFromString<InternalSessionServerResponse>(content)
+                val decoded =
+                    Json.decodeFromString<InternalEncodedProfile>(response.properties[0]["value"]!!.decodeBase64String())
+                URL(decoded.textures.SKIN["url"])
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
     if (skin == null) {
         call.respond(HttpStatusCode.NotFound, "no skin data found from server")
         return
@@ -112,6 +138,24 @@ suspend fun PipelineContext<Unit, ApplicationCall>.userSkin(parent: Main) {
 
     call.respondBytes(bytes, ContentType.Image.PNG)
 }
+
+@Serializable
+data class InternalSessionServerResponse(
+    val id: String,
+    val name: String,
+    val properties: List<Map<String, String>>
+)
+@Serializable
+data class InternalEncodedProfile(
+    val profileId: String,
+    val profileName: String,
+    val textures: InternalEncodedProfileTextures,
+    val timestamp: Long
+)
+@Serializable
+data class InternalEncodedProfileTextures(
+    val SKIN: Map<String, String>
+)
 
 @Serializable
 data class TerrainRequestLocation(val x: Int, val z: Int)

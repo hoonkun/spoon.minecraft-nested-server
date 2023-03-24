@@ -7,6 +7,7 @@ import org.bukkit.event.player.PlayerMoveEvent
 import io.ktor.server.websocket.sendSerialized
 import kiwi.hoonkun.plugins.spoon.extensions.spoon
 import kiwi.hoonkun.plugins.spoon.server.*
+import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOfflinePlayer
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -129,7 +130,7 @@ class LiveDataObserver(private val parent: Main): Listener {
     fun onPlayerDisconnect(event: PlayerQuitEvent) {
         val data = PlayerDisconnectData(
             type = LiveDataType.PlayerDisconnect,
-            playerId = event.player.playerProfile.uniqueId.toString()
+            player = SpoonOfflinePlayer.bukkit(event.player)
         )
 
         scope.launch {
