@@ -5,6 +5,7 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerMoveEvent
 import io.ktor.server.websocket.sendSerialized
+import kiwi.hoonkun.plugins.spoon.extensions.spoon
 import kiwi.hoonkun.plugins.spoon.server.*
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
 import kotlinx.coroutines.CoroutineScope
@@ -98,6 +99,17 @@ class LiveDataObserver(private val parent: Main): Listener {
 
         scope.launch {
             parent.subscribers(LiveDataType.PlayerMove).forEach { it.session.sendSerialized(data) }
+        }
+
+        if (event.from.world?.environment == event.to?.world?.environment) return
+
+        val portalData = PlayerPortalData(
+            type = LiveDataType.PlayerPortal,
+            playerId = event.player.playerProfile.uniqueId.toString(),
+            into = event.to?.world?.environment.spoon()
+        )
+        scope.launch {
+            parent.subscribers(LiveDataType.PlayerPortal).forEach { it.session.sendSerialized(portalData) }
         }
     }
 

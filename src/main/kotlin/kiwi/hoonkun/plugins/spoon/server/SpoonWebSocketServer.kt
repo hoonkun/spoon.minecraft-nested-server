@@ -6,6 +6,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kiwi.hoonkun.plugins.spoon.Main
+import kiwi.hoonkun.plugins.spoon.extensions.spoon
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -35,6 +36,17 @@ class Connection(val session: DefaultWebSocketServerSession) {
                     )
                 }
             }
+            LiveDataType.PlayerPortal -> {
+                parent.server.onlinePlayers.forEach {
+                    session.sendSerialized(
+                        PlayerPortalData(
+                            type = LiveDataType.PlayerPortal,
+                            playerId = it.playerProfile.uniqueId.toString(),
+                            into = it.location.world?.environment.spoon()
+                        )
+                    )
+                }
+            }
             LiveDataType.DaylightCycle -> {
                 val overworld = parent.overworld ?: return
                 session.sendSerialized(DaylightCycleData(type = LiveDataType.DaylightCycle, time = overworld.time))
@@ -49,6 +61,7 @@ class LiveDataType {
         const val PlayerConnect = "PlayerConnect"
         const val PlayerDisconnect = "PlayerDisconnect"
         const val DaylightCycle = "DaylightCycle"
+        const val PlayerPortal = "PlayerPortal"
     }
 }
 
@@ -69,6 +82,9 @@ data class PlayerDisconnectData(val type: String, val playerId: String)
 
 @Serializable
 data class DaylightCycleData(val type: String, val time: Long)
+
+@Serializable
+data class PlayerPortalData(val type: String, val playerId: String, val into: String)
 
 fun Application.websocketServer(parent: Main) {
     install(WebSockets) {
