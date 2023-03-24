@@ -6,6 +6,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerMoveEvent
 import io.ktor.server.websocket.sendSerialized
 import kiwi.hoonkun.plugins.spoon.extensions.spoon
+import kiwi.hoonkun.plugins.spoon.plugin.core.TerrainSurfaceGenerator
 import kiwi.hoonkun.plugins.spoon.server.*
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOfflinePlayer
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
@@ -13,6 +14,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import org.bukkit.event.player.PlayerGameModeChangeEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerTeleportEvent
@@ -25,6 +29,8 @@ class LiveDataDelays {
 class LiveDataCache {
     val onPlayerMove = mutableMapOf<String, PlayerMoveData>()
     var onDaylightCycle: Long = 0L
+    val onPlayerHealth = mutableMapOf<String, Double>()
+    val onPlayerExp = mutableMapOf<String, Pair<Int, Float>>()
 }
 
 class LiveDataObserver(private val parent: Main): Listener {
@@ -42,7 +48,15 @@ class LiveDataObserver(private val parent: Main): Listener {
         scope.launch {
             while (state == "observing") {
                 observeTime()
+                observeHealth()
+                observeExp()
                 delay(500)
+            }
+        }
+        scope.launch {
+            while (state == "observing") {
+                observeTerrain()
+                delay(750)
             }
         }
     }
@@ -56,8 +70,70 @@ class LiveDataObserver(private val parent: Main): Listener {
         cache.onDaylightCycle = overworld.time
     }
 
+    private suspend fun observeHealth() {
+        parent.server.onlinePlayers.forEach { player ->
+            val playerId = player.playerProfile.uniqueId.toString()
+            if (player.health == cache.onPlayerHealth[playerId]) return@forEach
+            parent.subscribers(LiveDataType.PlayerHealth)
+                .forEach { it.session.sendSerialized(PlayerHealthData(LiveDataType.PlayerHealth, playerId, player.health)) }
+
+            cache.onPlayerHealth[playerId] = player.health
+        }
+    }
+
+    private suspend fun observeExp() {
+        parent.server.onlinePlayers.forEach { player ->
+            val playerId = player.playerProfile.uniqueId.toString()
+            val (level, exp) = cache.onPlayerExp[playerId] ?: (0 to 0)
+            if (player.level == level && player.exp == exp) return@forEach
+            parent.subscribers(LiveDataType.PlayerExp)
+                .forEach { it.session.sendSerialized(PlayerExpData(LiveDataType.PlayerExp, playerId, player.level, player.exp)) }
+
+            cache.onPlayerExp[playerId] = player.level to player.exp
+        }
+    }
+
+    private suspend fun observeTerrain() {
+        val cached = mutableMapOf<String, TerrainResponse>()
+        parent.subscribers(LiveDataType.Terrain).mapNotNull { conn -> conn.extras[LiveDataType.Terrain]?.let { conn to it } }
+            .forEach { (connection, extra) ->
+                val already = cached[extra]
+                if (already != null) {
+                    connection.session.sendSerialized(already)
+                    return
+                }
+
+                val payload = Json.decodeFromString<TerrainRequest>(extra)
+                val world = when (payload.environment) {
+                    "overworld" -> parent.overworld
+                    "the_nether" -> parent.theNether
+                    "the_end" -> parent.theEnd
+                    else -> null
+                } ?: return
+                val new = TerrainSurfaceGenerator.generate(parent, world, payload.scale, payload.center, payload.limit)
+                connection.session.sendSerialized(TerrainSubscriptionData(type = "Terrain", terrain = new))
+                cached[extra] = new
+            }
+    }
+
     fun unobserve() {
         state = "idle"
+    }
+
+    @EventHandler
+    fun onPlayerGameMode(event: PlayerGameModeChangeEvent) {
+        scope.launch {
+            parent.subscribers(LiveDataType.PlayerGameMode)
+                .forEach {
+                    it.session.sendSerialized(
+                        PlayerGameModeData(
+                            LiveDataType.PlayerGameMode,
+                            event.player.playerProfile.uniqueId.toString(),
+                            event.newGameMode
+                        )
+                    )
+                }
+        }
     }
 
     @EventHandler

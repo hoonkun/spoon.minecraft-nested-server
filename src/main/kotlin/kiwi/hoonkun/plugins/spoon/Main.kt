@@ -40,6 +40,8 @@ class Main : JavaPlugin() {
     private val userExecutor = UserExecutor(this)
 
     val overworld get() = server.worlds.find { it.environment == World.Environment.NORMAL }
+    val theNether get() = server.worlds.find { it.environment == World.Environment.NETHER }
+    val theEnd get() = server.worlds.find { it.environment == World.Environment.THE_END }
 
     private val observer = LiveDataObserver(this)
 

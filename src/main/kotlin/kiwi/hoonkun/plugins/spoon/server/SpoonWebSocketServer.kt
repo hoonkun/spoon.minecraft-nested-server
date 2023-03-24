@@ -12,6 +12,7 @@ import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import org.bukkit.GameMode
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -21,6 +22,7 @@ class Connection(val session: DefaultWebSocketServerSession) {
     }
     val name = "observer-${lastId.getAndIncrement()}"
     val subscribed = mutableSetOf<String>()
+    val extras = mutableMapOf<String, String?>()
 
     suspend fun initialData(parent: Main, which: String) {
         when (which) {
@@ -63,6 +65,10 @@ class LiveDataType {
         const val PlayerDisconnect = "PlayerDisconnect"
         const val DaylightCycle = "DaylightCycle"
         const val PlayerPortal = "PlayerPortal"
+        const val PlayerHealth = "PlayerHealth"
+        const val PlayerExp = "PlayerExp"
+        const val PlayerGameMode = "PlayerGameMode"
+        const val Terrain = "Terrain"
     }
 }
 
@@ -70,7 +76,7 @@ class LiveDataType {
 data class SocketInitializeResponse(val type: String, val identifier: String)
 
 @Serializable
-data class LiveDataSubscribeRequest(val which: String, val operation: String)
+data class LiveDataSubscribeRequest(val which: String, val operation: String, val extra: String? = null)
 
 @Serializable
 data class PlayerMoveData(val type: String, val playerId: String, val x: Double, val y: Double, val z: Double)
@@ -86,6 +92,18 @@ data class DaylightCycleData(val type: String, val time: Long)
 
 @Serializable
 data class PlayerPortalData(val type: String, val playerId: String, val into: String)
+
+@Serializable
+data class PlayerHealthData(val type: String, val playerId: String, val health: Double)
+
+@Serializable
+data class PlayerExpData(val type: String, val playerId: String, val level: Int, val exp: Float)
+
+@Serializable
+data class PlayerGameModeData(val type: String, val playerId: String, val gameMode: GameMode)
+
+@Serializable
+data class TerrainSubscriptionData(val type: String, val terrain: TerrainResponse)
 
 fun Application.websocketServer(parent: Main) {
     install(WebSockets) {
@@ -109,6 +127,7 @@ fun Application.websocketServer(parent: Main) {
                     when (request.operation) {
                         "subscribe" -> {
                             thisConnection.subscribed.add(request.which)
+                            thisConnection.extras[request.which] = request.extra
                         }
                         "unsubscribe" -> {
                             thisConnection.subscribed.remove(request.which)
