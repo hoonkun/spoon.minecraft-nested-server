@@ -6,6 +6,7 @@ import kiwi.hoonkun.plugins.spoon.server.TerrainData
 import kiwi.hoonkun.plugins.spoon.server.TerrainRequestLocation
 import kiwi.hoonkun.plugins.spoon.server.TerrainResponse
 import org.bukkit.HeightMap
+import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
 
@@ -72,10 +73,12 @@ class TerrainSurfaceGenerator {
                 } else {
                     var block = world.getBlockAt(x, limit, z)
 
-                    if (block.type.isSolid) setYLimited()
+                    val validBlock = { (block.type.isSolid || block.type == Material.WATER || block.type == Material.LAVA) && !block.type.isAir }
+
+                    if (validBlock()) setYLimited()
                     else setYNotLimited()
 
-                    while (!block.type.isSolid) {
+                    while (!validBlock()) {
                         block = world.getBlockAt(x, block.y - 1, z)
                     }
 
