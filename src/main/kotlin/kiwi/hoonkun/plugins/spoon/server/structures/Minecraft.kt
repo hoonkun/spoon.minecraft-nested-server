@@ -2,6 +2,7 @@ package kiwi.hoonkun.plugins.spoon.server.structures
 
 import kotlinx.serialization.Serializable
 import org.bukkit.Location
+import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
 
 
@@ -18,10 +19,9 @@ data class SpoonLocation(
 }
 
 @Serializable
-data class SpoonPlayer(
-    val userId: String,
+data class SpoonOnlinePlayer(
+    val uniqueId: String,
     val name: String,
-    val texture: String?,
     val gameMode: String,
     val health: Double,
     val level: Int,
@@ -29,28 +29,24 @@ data class SpoonPlayer(
     val location: SpoonLocation
 ) {
     companion object {
-        fun bukkit(it: Player): SpoonPlayer =
-            SpoonPlayer(
-                userId = it.playerProfile.uniqueId.toString(),
+        fun bukkit(it: Player): SpoonOnlinePlayer =
+            SpoonOnlinePlayer(
+                uniqueId = it.playerProfile.uniqueId.toString(),
                 name = it.name, gameMode = it.gameMode.name, health = it.health, level = it.level, exp = it.exp,
-                texture = it.playerProfile.textures.skin?.toExternalForm(),
                 location = SpoonLocation.bukkit(it.location)
             )
     }
 }
 
 @Serializable
-data class SpoonCommonPlayer(
-    val userId: String,
+data class SpoonOfflinePlayer(
+    val uniqueId: String,
     val name: String,
-    val texture: String?,
-    val gameMode: String
 ) {
     companion object {
-        fun bukkit(it: Player): SpoonCommonPlayer =
-            SpoonCommonPlayer(
-                userId = it.playerProfile.uniqueId.toString(), name = it.name, gameMode = it.gameMode.name,
-                texture = it.playerProfile.textures.skin?.toExternalForm()
+        fun bukkit(it: OfflinePlayer): SpoonOfflinePlayer =
+            SpoonOfflinePlayer(
+                uniqueId = it.playerProfile.uniqueId.toString(), name = it.name ?: "unknown"
             )
     }
 }

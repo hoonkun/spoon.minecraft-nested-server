@@ -7,7 +7,7 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kiwi.hoonkun.plugins.spoon.Main
 import kiwi.hoonkun.plugins.spoon.extensions.spoon
-import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
+import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -75,7 +75,7 @@ data class LiveDataSubscribeRequest(val which: String, val operation: String)
 data class PlayerMoveData(val type: String, val playerId: String, val x: Double, val y: Double, val z: Double)
 
 @Serializable
-data class PlayerConnectData(val type: String, val player: SpoonPlayer)
+data class PlayerConnectData(val type: String, val player: SpoonOnlinePlayer)
 
 @Serializable
 data class PlayerDisconnectData(val type: String, val playerId: String)

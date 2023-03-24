@@ -7,7 +7,7 @@ import org.bukkit.event.player.PlayerMoveEvent
 import io.ktor.server.websocket.sendSerialized
 import kiwi.hoonkun.plugins.spoon.extensions.spoon
 import kiwi.hoonkun.plugins.spoon.server.*
-import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
+import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -117,7 +117,7 @@ class LiveDataObserver(private val parent: Main): Listener {
     fun onPlayerConnect(event: PlayerJoinEvent) {
         val data = PlayerConnectData(
             type = LiveDataType.PlayerConnect,
-            player = SpoonPlayer.bukkit(event.player)
+            player = SpoonOnlinePlayer.bukkit(event.player)
         )
 
         scope.launch {

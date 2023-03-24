@@ -11,8 +11,8 @@ import io.ktor.util.pipeline.*
 import kiwi.hoonkun.plugins.spoon.Main
 import kiwi.hoonkun.plugins.spoon.extensions.forEach
 import kiwi.hoonkun.plugins.spoon.server.auth.respondJWT
-import kiwi.hoonkun.plugins.spoon.server.structures.SpoonCommonPlayer
-import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
+import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOfflinePlayer
+import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -31,8 +31,9 @@ fun Application.apiServer(parent: Main) {
         authenticate(optional = true) {
             get("/me") { call.respond(call.principal<JWTPrincipal>()!!.payload.claims.getValue("username").asString()) }
             get("$prefix/hello") { hello() }
-            get("$prefix/connected-users") { connectedUsers(parent) }
-            get("$prefix/connected-user-graphic/{userId}") { userSkin(parent) }
+            get("$prefix/players/online") { onlinePlayers(parent) }
+            get("$prefix/players/offline") { offlinePlayers(parent) }
+            get("$prefix/players/graphic/{userId}") { userSkin(parent) }
         }
         authenticate {
             post("$prefix/run") { runCommand(parent) }
@@ -52,16 +53,14 @@ suspend fun PipelineContext<Unit, ApplicationCall>.hello() {
     }
 }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.connectedUsers(parent: Main) {
-    val principal = call.principal<JWTPrincipal>()
+suspend fun PipelineContext<Unit, ApplicationCall>.onlinePlayers(parent: Main) {
+    val players = parent.server.onlinePlayers.map { SpoonOnlinePlayer.bukkit(it) }
+    call.respond(players)
+}
 
-    if (principal != null) {
-        val players = parent.server.onlinePlayers.map { SpoonPlayer.bukkit(it) }
-        call.respond(players)
-    } else {
-        val players = parent.server.onlinePlayers.map { SpoonCommonPlayer.bukkit(it) }
-        call.respond(players)
-    }
+suspend fun PipelineContext<Unit, ApplicationCall>.offlinePlayers(parent: Main) {
+    val players = parent.server.offlinePlayers.map { SpoonOfflinePlayer.bukkit(it) }
+    call.respond(players)
 }
 
 @Serializable
