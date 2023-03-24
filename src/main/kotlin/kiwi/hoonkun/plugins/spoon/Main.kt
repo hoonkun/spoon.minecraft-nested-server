@@ -10,16 +10,14 @@ import io.ktor.server.plugins.cors.routing.*
 import kiwi.hoonkun.plugins.spoon.plugin.ConsoleFilter
 import kiwi.hoonkun.plugins.spoon.plugin.commands.UserExecutor
 import kiwi.hoonkun.plugins.spoon.plugin.listeners.LiveDataObserver
-import kiwi.hoonkun.plugins.spoon.server.Connection
-import kiwi.hoonkun.plugins.spoon.server.SpoonLog
-import kiwi.hoonkun.plugins.spoon.server.apiServer
+import kiwi.hoonkun.plugins.spoon.server.*
 import kiwi.hoonkun.plugins.spoon.server.auth.jwtAuthentication
 import kiwi.hoonkun.plugins.spoon.server.structures.User
-import kiwi.hoonkun.plugins.spoon.server.websocketServer
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.core.Logger
+import org.bukkit.World
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.plugin.java.JavaPlugin
@@ -41,17 +39,24 @@ class Main : JavaPlugin() {
 
     private val userExecutor = UserExecutor(this)
 
+    val overworld get() = server.worlds.find { it.environment == World.Environment.NORMAL }
+
+    private val observer = LiveDataObserver(this)
+
     override fun onEnable() {
         super.onEnable()
         registerLoggerHandlers()
 
         spoon.start()
 
-        server.pluginManager.registerEvents(LiveDataObserver(this), this)
+        server.pluginManager.registerEvents(observer, this)
+        observer.observe()
     }
 
     override fun onDisable() {
         super.onDisable()
+
+        observer.unobserve()
         spoon.stop()
     }
 
@@ -77,6 +82,10 @@ class Main : JavaPlugin() {
 
     private fun registerLoggerHandlers() {
         (LogManager.getRootLogger() as Logger).addFilter(ConsoleFilter(this))
+    }
+
+    fun subscribers(which: String): List<Connection> {
+        return spoonSocketConnections.filter { it.subscribed.contains(which) }
     }
 
 }

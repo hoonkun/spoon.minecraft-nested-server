@@ -1,20 +1,20 @@
 package kiwi.hoonkun.plugins.spoon.plugin.listeners
 
 import kiwi.hoonkun.plugins.spoon.Main
-import kiwi.hoonkun.plugins.spoon.server.LiveDataType
-import kiwi.hoonkun.plugins.spoon.server.PlayerMoveData
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerMoveEvent
 import io.ktor.server.websocket.sendSerialized
-import kiwi.hoonkun.plugins.spoon.server.PlayerConnectData
-import kiwi.hoonkun.plugins.spoon.server.PlayerDisconnectData
+import kiwi.hoonkun.plugins.spoon.server.*
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerTeleportEvent
+import kotlin.math.absoluteValue
 
 class LiveDataDelays {
     val onPlayerMove = mutableMapOf<String, Long>()
@@ -22,6 +22,7 @@ class LiveDataDelays {
 
 class LiveDataCache {
     val onPlayerMove = mutableMapOf<String, PlayerMoveData>()
+    var onDaylightCycle: Long = 0L
 }
 
 class LiveDataObserver(private val parent: Main): Listener {
@@ -31,6 +32,31 @@ class LiveDataObserver(private val parent: Main): Listener {
     private val delays = LiveDataDelays()
 
     private val cache = LiveDataCache()
+
+    private var state = "idle"
+
+    fun observe() {
+        state = "observing"
+        scope.launch {
+            while (state == "observing") {
+                observeTime()
+                delay(500)
+            }
+        }
+    }
+
+    private suspend fun observeTime() {
+        val overworld = parent.overworld ?: return
+        if ((cache.onDaylightCycle - overworld.time).absoluteValue > 20) {
+            parent.subscribers(LiveDataType.DaylightCycle)
+                .forEach { it.session.sendSerialized(DaylightCycleData(type = LiveDataType.DaylightCycle, time = overworld.time)) }
+        }
+        cache.onDaylightCycle = overworld.time
+    }
+
+    fun unobserve() {
+        state = "idle"
+    }
 
     @EventHandler
     fun onPlayerMove(event: PlayerMoveEvent) {
@@ -55,9 +81,23 @@ class LiveDataObserver(private val parent: Main): Listener {
         delays.onPlayerMove[playerUID] = current
 
         scope.launch {
-            parent.spoonSocketConnections
-                .filter { it.subscribed.contains(LiveDataType.PlayerMove) }
-                .forEach { it.session.sendSerialized(data) }
+            parent.subscribers(LiveDataType.PlayerMove).forEach { it.session.sendSerialized(data) }
+        }
+    }
+
+    @EventHandler
+    fun onPlayerTeleport(event: PlayerTeleportEvent) {
+        val location = event.to ?: return
+        val data = PlayerMoveData(
+            type = LiveDataType.PlayerMove,
+            playerId = event.player.playerProfile.uniqueId.toString(),
+            x = location.x,
+            y = location.y,
+            z = location.z
+        )
+
+        scope.launch {
+            parent.subscribers(LiveDataType.PlayerMove).forEach { it.session.sendSerialized(data) }
         }
     }
 
@@ -69,9 +109,7 @@ class LiveDataObserver(private val parent: Main): Listener {
         )
 
         scope.launch {
-            parent.spoonSocketConnections
-                .filter { it.subscribed.contains(LiveDataType.PlayerConnect) }
-                .forEach { it.session.sendSerialized(data) }
+            parent.subscribers(LiveDataType.PlayerConnect).forEach { it.session.sendSerialized(data) }
         }
     }
 
@@ -83,9 +121,7 @@ class LiveDataObserver(private val parent: Main): Listener {
         )
 
         scope.launch {
-            parent.spoonSocketConnections
-                .filter { it.subscribed.contains(LiveDataType.PlayerDisconnect) }
-                .forEach { it.session.sendSerialized(data) }
+            parent.subscribers(LiveDataType.PlayerDisconnect).forEach { it.session.sendSerialized(data) }
         }
     }
 

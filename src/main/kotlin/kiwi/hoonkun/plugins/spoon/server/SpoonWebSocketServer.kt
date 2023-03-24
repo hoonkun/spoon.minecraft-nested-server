@@ -20,7 +20,7 @@ class Connection(val session: DefaultWebSocketServerSession) {
     val name = "observer-${lastId.getAndIncrement()}"
     val subscribed = mutableSetOf<String>()
 
-    suspend fun init(parent: Main, which: String) {
+    suspend fun initialData(parent: Main, which: String) {
         when (which) {
             LiveDataType.PlayerMove -> {
                 parent.server.onlinePlayers.forEach {
@@ -35,6 +35,10 @@ class Connection(val session: DefaultWebSocketServerSession) {
                     )
                 }
             }
+            LiveDataType.DaylightCycle -> {
+                val overworld = parent.overworld ?: return
+                session.sendSerialized(DaylightCycleData(type = LiveDataType.DaylightCycle, time = overworld.time))
+            }
         }
     }
 }
@@ -44,6 +48,7 @@ class LiveDataType {
         const val PlayerMove = "PlayerMove"
         const val PlayerConnect = "PlayerConnect"
         const val PlayerDisconnect = "PlayerDisconnect"
+        const val DaylightCycle = "DaylightCycle"
     }
 }
 
@@ -61,6 +66,9 @@ data class PlayerConnectData(val type: String, val player: SpoonPlayer)
 
 @Serializable
 data class PlayerDisconnectData(val type: String, val playerId: String)
+
+@Serializable
+data class DaylightCycleData(val type: String, val time: Long)
 
 fun Application.websocketServer(parent: Main) {
     install(WebSockets) {
@@ -89,7 +97,7 @@ fun Application.websocketServer(parent: Main) {
                             thisConnection.subscribed.remove(request.which)
                         }
                         "initial_data_request" -> {
-                            thisConnection.init(parent, request.which)
+                            thisConnection.initialData(parent, request.which)
                         }
                     }
                 }
