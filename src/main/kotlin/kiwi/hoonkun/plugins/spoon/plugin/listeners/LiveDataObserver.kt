@@ -144,14 +144,13 @@ class LiveDataObserver(private val parent: Main): Listener {
 
         val location = event.player.location
 
-        if (cache.onPlayerMove[playerUID].let { it != null && it.x == location.x && it.z == location.z }) return
+        if (cache.onPlayerMove[playerUID].let { it != null && it.location[0] == location.x && it.location[1] == location.z }) return
 
         val data = PlayerMoveData(
             type = LiveDataType.PlayerMove,
             playerId = playerUID,
-            x = location.x,
-            y = location.y,
-            z = location.z
+            location = listOf(location.x, location.y, location.z),
+            environment = location.world?.environment.spoon()
         )
 
         cache.onPlayerMove[playerUID] = data
@@ -169,24 +168,12 @@ class LiveDataObserver(private val parent: Main): Listener {
         val data = PlayerMoveData(
             type = LiveDataType.PlayerMove,
             playerId = event.player.playerProfile.uniqueId.toString(),
-            x = location.x,
-            y = location.y,
-            z = location.z
+            location = listOf(location.x, location.y, location.z),
+            environment = location.world?.environment.spoon()
         )
 
         scope.launch {
             parent.subscribers(LiveDataType.PlayerMove).forEach { it.session.sendSerialized(data) }
-        }
-
-        if (event.from.world?.environment == event.to?.world?.environment) return
-
-        val portalData = PlayerPortalData(
-            type = LiveDataType.PlayerPortal,
-            playerId = event.player.playerProfile.uniqueId.toString(),
-            into = event.to?.world?.environment.spoon()
-        )
-        scope.launch {
-            parent.subscribers(LiveDataType.PlayerPortal).forEach { it.session.sendSerialized(portalData) }
         }
     }
 

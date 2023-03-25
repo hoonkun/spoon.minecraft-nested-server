@@ -32,20 +32,8 @@ class Connection(val session: DefaultWebSocketServerSession) {
                         PlayerMoveData(
                             type = LiveDataType.PlayerMove,
                             playerId = it.playerProfile.uniqueId.toString(),
-                            x = it.location.x,
-                            y = it.location.y,
-                            z = it.location.z,
-                        )
-                    )
-                }
-            }
-            LiveDataType.PlayerPortal -> {
-                parent.server.onlinePlayers.forEach {
-                    session.sendSerialized(
-                        PlayerPortalData(
-                            type = LiveDataType.PlayerPortal,
-                            playerId = it.playerProfile.uniqueId.toString(),
-                            into = it.location.world?.environment.spoon()
+                            location = listOf(it.location.x, it.location.y, it.location.z),
+                            environment = it.location.world?.environment.spoon()
                         )
                     )
                 }
@@ -64,7 +52,6 @@ class LiveDataType {
         const val PlayerConnect = "PlayerConnect"
         const val PlayerDisconnect = "PlayerDisconnect"
         const val DaylightCycle = "DaylightCycle"
-        const val PlayerPortal = "PlayerPortal"
         const val PlayerHealth = "PlayerHealth"
         const val PlayerExp = "PlayerExp"
         const val PlayerGameMode = "PlayerGameMode"
@@ -79,7 +66,7 @@ data class SocketInitializeResponse(val type: String, val identifier: String)
 data class LiveDataSubscribeRequest(val which: String, val operation: String, val extra: String? = null)
 
 @Serializable
-data class PlayerMoveData(val type: String, val playerId: String, val x: Double, val y: Double, val z: Double)
+data class PlayerMoveData(val type: String, val playerId: String, val location: List<Double>, val environment: String)
 
 @Serializable
 data class PlayerConnectData(val type: String, val player: SpoonOnlinePlayer)
@@ -89,9 +76,6 @@ data class PlayerDisconnectData(val type: String, val player: SpoonOfflinePlayer
 
 @Serializable
 data class DaylightCycleData(val type: String, val time: Long)
-
-@Serializable
-data class PlayerPortalData(val type: String, val playerId: String, val into: String)
 
 @Serializable
 data class PlayerHealthData(val type: String, val playerId: String, val health: Double)
