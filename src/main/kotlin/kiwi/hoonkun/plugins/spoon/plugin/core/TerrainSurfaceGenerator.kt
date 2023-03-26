@@ -52,38 +52,40 @@ class TerrainSurfaceGenerator {
 
             var hasRemainingYLimitedData = false
 
+            val addBlockY: (Block, Int, Int) -> Unit = { block, x, z ->
+                if (block.type.key.key == "water") blockYs.add(world.getHighestBlockAt(x, z, HeightMap.OCEAN_FLOOR).y)
+                else blockYs.add(block.y)
+            }
+
             ((fromX until toX) to (fromZ until toZ)).forEach block@ { x, z ->
                 val highest = world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING)
 
-                val addBlockY: (Block) -> Unit = {
-                    if (it.type.key.key == "water") blockYs.add(world.getHighestBlockAt(x, z, HeightMap.OCEAN_FLOOR).y)
-                    else blockYs.add(it.y)
-                }
-
                 if (limit == null) {
                     blockKeys.add(highest.type.key.key)
-                    addBlockY(highest)
+                    addBlockY(highest, x, z)
                     return@block
                 }
 
                 if (highest.y < limit) {
                     blockKeys.add(highest.type.key.key)
-                    addBlockY(highest)
+                    addBlockY(highest, x, z)
                     setYNotLimited()
                 } else {
                     var block = world.getBlockAt(x, limit, z)
 
-                    val validBlock = { (block.type.isSolid || block.type == Material.WATER || block.type == Material.LAVA) && !block.type.isAir }
+                    val validBlock: (Block) -> Boolean = { (it.type.isSolid || it.type == Material.WATER || it.type == Material.LAVA) && !it.type.isAir }
 
-                    if (validBlock()) setYLimited()
+                    if (validBlock(block)) setYLimited()
                     else setYNotLimited()
 
-                    while (!validBlock()) {
-                        block = world.getBlockAt(x, block.y - 1, z)
+                    while (!validBlock(block)) {
+                        block = world.getBlockAt(x, block.y - 3, z)
                     }
+                    world.getBlockAt(x, block.y + 1, z).let { if (validBlock(it)) block = it }
+                    world.getBlockAt(x, block.y + 2, z).let { if (validBlock(it)) block = it }
 
                     blockKeys.add(block.type.key.key)
-                    addBlockY(block)
+                    addBlockY(block, x, z)
                 }
 
                 hasRemainingYLimitedData = true
@@ -109,26 +111,6 @@ class TerrainSurfaceGenerator {
 
             var hasRemainingBlockData = false
 
-            blockKeys.forEach { key ->
-                val paletteIndex = palette.indexOf(key).toLong()
-
-                blockDataBits = blockDataBits shl bitsPerBlock
-                blockDataBits = blockDataBits or paletteIndex
-
-                blockDataBitIndex += bitsPerBlock
-
-                hasRemainingBlockData = true
-
-                if (blockDataBitIndex + bitsPerBlock > Int.SIZE_BITS) {
-                    blockLongs.add(blockDataBits)
-                    blockDataBits = 0
-                    blockDataBitIndex = 0
-                    hasRemainingBlockData = false
-                }
-            }
-
-            if (hasRemainingBlockData) blockLongs.add(blockDataBits)
-
             var shadowDataBits = 0L
             var shadowDataBitIndex = 0
 
@@ -148,10 +130,29 @@ class TerrainSurfaceGenerator {
                 shadowDataBits = shadowDataBits shl 2
             }
 
-            blockYs.forEachIndexed blockY@ { index, it ->
+            for (index in 0 until blockKeys.size) {
+                val key = blockKeys[index]
+                val y = blockYs[index]
+
+                val paletteIndex = palette.indexOf(key).toLong()
+
+                blockDataBits = blockDataBits shl bitsPerBlock
+                blockDataBits = blockDataBits or paletteIndex
+
+                blockDataBitIndex += bitsPerBlock
+
+                hasRemainingBlockData = true
+
+                if (blockDataBitIndex + bitsPerBlock > Int.SIZE_BITS) {
+                    blockLongs.add(blockDataBits)
+                    blockDataBits = 0
+                    blockDataBitIndex = 0
+                    hasRemainingBlockData = false
+                }
+
                 val aboveYIndex = if (index % (16 * scale) == 0) -1 else index - 1
-                if (aboveYIndex < 0 || blockYs[aboveYIndex] > it) setBlockShadowed()
-                else if (blockYs[aboveYIndex] < it) setBlockLighted()
+                if (aboveYIndex < 0 || blockYs[aboveYIndex] > y) setBlockShadowed()
+                else if (blockYs[aboveYIndex] < y) setBlockLighted()
                 else setBlockNotShadowed()
 
                 shadowDataBitIndex += 2
@@ -165,6 +166,7 @@ class TerrainSurfaceGenerator {
                 }
             }
 
+            if (hasRemainingBlockData) blockLongs.add(blockDataBits)
             if (hasRemainingShadowData) shadowLongs.add(shadowDataBits)
 
             return TerrainResponse(
