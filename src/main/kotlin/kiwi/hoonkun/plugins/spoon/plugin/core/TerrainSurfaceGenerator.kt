@@ -79,10 +79,8 @@ class TerrainSurfaceGenerator {
                     else setYNotLimited()
 
                     while (!validBlock(block)) {
-                        block = world.getBlockAt(x, block.y - 3, z)
+                        block = world.getBlockAt(x, block.y - 1, z)
                     }
-                    world.getBlockAt(x, block.y + 1, z).let { if (validBlock(it)) block = it }
-                    world.getBlockAt(x, block.y + 2, z).let { if (validBlock(it)) block = it }
 
                     blockKeys.add(block.type.key.key)
                     addBlockY(block, x, z)
