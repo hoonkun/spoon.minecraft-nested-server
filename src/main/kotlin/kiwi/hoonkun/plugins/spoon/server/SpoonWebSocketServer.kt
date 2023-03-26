@@ -49,6 +49,7 @@ class Connection(val session: DefaultWebSocketServerSession) {
 class LiveDataType {
     companion object {
         const val PlayerLocation = "PlayerLocation"
+        const val PlayerView = "PlayerView"
         const val PlayerConnect = "PlayerConnect"
         const val PlayerDisconnect = "PlayerDisconnect"
         const val DaylightCycle = "DaylightCycle"
@@ -67,6 +68,9 @@ data class LiveDataSubscribeRequest(val which: String, val operation: String, va
 
 @Serializable
 data class PlayerMoveData(val type: String, val playerId: String, val location: List<Double>, val environment: String)
+
+@Serializable
+data class PlayerViewData(val type: String, val playerId: String, val yaw: Float)
 
 @Serializable
 data class PlayerConnectData(val type: String, val player: SpoonOnlinePlayer)

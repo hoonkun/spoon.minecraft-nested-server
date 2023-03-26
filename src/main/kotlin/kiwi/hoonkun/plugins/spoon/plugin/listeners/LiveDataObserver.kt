@@ -24,10 +24,12 @@ import kotlin.math.absoluteValue
 
 class LiveDataDelays {
     val onPlayerLocation = mutableMapOf<String, Long>()
+    val onPlayerView = mutableMapOf<String, Long>()
 }
 
 class LiveDataCache {
     val onPlayerMove = mutableMapOf<String, PlayerMoveData>()
+    val onPlayerView = mutableMapOf<String, Float>()
     var onDaylightCycle: Long = 0L
     val onPlayerHealth = mutableMapOf<String, Double>()
     val onPlayerExp = mutableMapOf<String, Pair<Int, Float>>()
@@ -140,7 +142,7 @@ class LiveDataObserver(private val parent: Main): Listener {
     fun onPlayerLocation(event: PlayerMoveEvent) {
         val current = System.currentTimeMillis()
         val playerUID = event.player.uniqueId.toString()
-        if (current - (delays.onPlayerLocation[playerUID] ?: 0) < 150) return
+        if (current - (delays.onPlayerLocation[playerUID] ?: 0) < 225) return
 
         val location = event.player.location
 
@@ -159,6 +161,30 @@ class LiveDataObserver(private val parent: Main): Listener {
 
         scope.launch {
             parent.subscribers(LiveDataType.PlayerLocation).forEach { it.session.sendSerialized(data) }
+        }
+    }
+
+    @EventHandler
+    fun onPlayerView(event: PlayerMoveEvent) {
+        val current = System.currentTimeMillis()
+        val playerUID = event.player.uniqueId.toString()
+        if (current - (delays.onPlayerView[playerUID] ?: 0) < 150) return
+
+        val new = event.player.location.yaw
+
+        if (cache.onPlayerView[playerUID] == new) return
+
+        val data = PlayerViewData(
+            type = LiveDataType.PlayerView,
+            playerId = playerUID,
+            yaw = new
+        )
+
+        cache.onPlayerView[playerUID] = new
+        delays.onPlayerView[playerUID] = current
+
+        scope.launch {
+            parent.subscribers(LiveDataType.PlayerView).forEach { it.session.sendSerialized(data) }
         }
     }
 
