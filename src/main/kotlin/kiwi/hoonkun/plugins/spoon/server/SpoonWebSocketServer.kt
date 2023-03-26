@@ -38,6 +38,17 @@ class Connection(val session: DefaultWebSocketServerSession) {
                     )
                 }
             }
+            LiveDataType.PlayerView -> {
+                parent.server.onlinePlayers.forEach {
+                    session.sendSerialized(
+                        PlayerViewData(
+                            type = LiveDataType.PlayerLocation,
+                            playerId = it.playerProfile.uniqueId.toString(),
+                            yaw = it.location.yaw
+                        )
+                    )
+                }
+            }
             LiveDataType.DaylightCycle -> {
                 val overworld = parent.overworld ?: return
                 session.sendSerialized(DaylightCycleData(type = LiveDataType.DaylightCycle, time = overworld.time))
