@@ -5,10 +5,11 @@ import kiwi.hoonkun.plugins.spoon.extensions.forEach
 import kiwi.hoonkun.plugins.spoon.server.TerrainData
 import kiwi.hoonkun.plugins.spoon.server.TerrainRequestLocation
 import kiwi.hoonkun.plugins.spoon.server.TerrainResponse
+import org.bukkit.ChunkSnapshot
 import org.bukkit.HeightMap
 import org.bukkit.Material
 import org.bukkit.World
-import org.bukkit.block.Block
+import kotlin.math.absoluteValue
 
 class TerrainSurfaceGenerator {
 
@@ -52,38 +53,54 @@ class TerrainSurfaceGenerator {
 
             var hasRemainingYLimitedData = false
 
-            val addBlockY: (Block, Int, Int) -> Unit = { block, x, z ->
-                if (block.type.key.key == "water") blockYs.add(world.getHighestBlockAt(x, z, HeightMap.OCEAN_FLOOR).y)
-                else blockYs.add(block.y)
+            val addBlockY: (Material, Int, Int, Int) -> Unit = { material, x, y, z ->
+                if (material.key.key == "water") blockYs.add(world.getHighestBlockAt(x, z, HeightMap.OCEAN_FLOOR).y)
+                else blockYs.add(y)
             }
 
+            val chunks = mutableMapOf<Pair<Int, Int>, ChunkSnapshot>()
+
             ((fromX until toX) to (fromZ until toZ)).forEach block@ { x, z ->
-                val highest = world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING)
+                val chunkX = (x / 16).let { if (x >= 0) it else it - 1 }
+                val chunkZ = (z / 16).let { if (z >= 0) it else it - 1 }
+
+                val chunk = chunks.getOrPut(chunkX to chunkZ) { world.getChunkAt(chunkX, chunkZ).chunkSnapshot }
+                val chunkBlockX = (x % 16).absoluteValue.let { if (x < 0) 15 - it else it }
+                val chunkBlockZ = (z % 16).absoluteValue.let { if (z < 0) 15 - it else it }
+
+                val highestY = chunk.getHighestBlockYAt(chunkBlockX, chunkBlockZ)
+                if (highestY == -1) {
+                    blockKeys.add("air")
+                    addBlockY(Material.AIR, x, -1, z)
+                    return@block
+                }
+                val highest = chunk.getBlockType(chunkBlockX, highestY, chunkBlockZ)
 
                 if (limit == null) {
-                    blockKeys.add(highest.type.key.key)
-                    addBlockY(highest, x, z)
+                    blockKeys.add(highest.key.key)
+                    addBlockY(highest, x, highestY, z)
                     return@block
                 }
 
-                if (highest.y < limit) {
-                    blockKeys.add(highest.type.key.key)
-                    addBlockY(highest, x, z)
+                if (highestY < limit) {
+                    blockKeys.add(highest.key.key)
+                    addBlockY(highest, x, highestY, z)
                     setYNotLimited()
                 } else {
-                    var block = world.getBlockAt(x, limit, z)
+                    var y = limit
+                    var block = chunk.getBlockType(chunkBlockX, y, chunkBlockZ)
 
-                    val validBlock: (Block) -> Boolean = { (it.type.isSolid || it.type == Material.WATER || it.type == Material.LAVA) && !it.type.isAir }
+                    val validBlock: (Material) -> Boolean = { (it.isSolid || it == Material.WATER || it == Material.LAVA) && !it.isAir }
 
                     if (validBlock(block)) setYLimited()
                     else setYNotLimited()
 
-                    while (!validBlock(block)) {
-                        block = world.getBlockAt(x, block.y - 1, z)
+                    while (!validBlock(block) && y >= 0) {
+                        block = chunk.getBlockType(chunkBlockX, --y, chunkBlockZ)
                     }
 
-                    blockKeys.add(block.type.key.key)
-                    addBlockY(block, x, z)
+                    blockKeys.add(block.key.key)
+                    addBlockY(block, x, y, z)
                 }
 
                 hasRemainingYLimitedData = true

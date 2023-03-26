@@ -13,6 +13,7 @@ import kiwi.hoonkun.plugins.spoon.plugin.listeners.LiveDataObserver
 import kiwi.hoonkun.plugins.spoon.server.*
 import kiwi.hoonkun.plugins.spoon.server.auth.jwtAuthentication
 import kiwi.hoonkun.plugins.spoon.server.structures.User
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.apache.logging.log4j.LogManager
@@ -44,6 +45,8 @@ class Main : JavaPlugin() {
     val theEnd get() = server.worlds.find { it.environment == World.Environment.THE_END }
 
     val observer = LiveDataObserver(this)
+
+    val mutex = Mutex()
 
     override fun onEnable() {
         super.onEnable()

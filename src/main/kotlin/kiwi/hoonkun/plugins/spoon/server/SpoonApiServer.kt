@@ -15,6 +15,7 @@ import kiwi.hoonkun.plugins.spoon.server.auth.respondJWT
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOfflinePlayer
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -184,7 +185,9 @@ suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
         return
     }
 
-    val response = TerrainSurfaceGenerator.generate(parent, world, data.scale, data.center, data.limit)
+    val response = parent.mutex.withLock {
+        TerrainSurfaceGenerator.generate(parent, world, data.scale, data.center, data.limit)
+    }
 
     parent.observer.cache.onTerrain[data] = response
     call.respond(response)

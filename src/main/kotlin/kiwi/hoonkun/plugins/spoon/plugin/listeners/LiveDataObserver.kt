@@ -13,6 +13,7 @@ import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.bukkit.event.player.PlayerGameModeChangeEvent
@@ -39,11 +40,11 @@ class LiveDataCache {
 class LiveDataObserver(private val parent: Main): Listener {
 
     private val scope = CoroutineScope(Dispatchers.IO)
-    private val heavyScope = CoroutineScope(Dispatchers.IO)
+
     private val thread = Thread {
         fixedRateTimer(name = "heavy", period = 3000) {
-            val responses = observeTerrain()
-            heavyScope.launch {
+            CoroutineScope(Dispatchers.IO).launch {
+                val responses = observeTerrain()
                 responses.forEach { (connection, response) ->
                     if (response != null)
                         connection.session.sendSerialized(TerrainSubscriptionData(type = "Terrain", terrain = response))
@@ -102,7 +103,7 @@ class LiveDataObserver(private val parent: Main): Listener {
         }
     }
 
-    private fun observeTerrain(): Map<Connection, TerrainResponse?> {
+    private suspend fun observeTerrain(): Map<Connection, TerrainResponse?> {
         val cached = mutableMapOf<TerrainRequest, TerrainResponse>()
 
         if (cache.onTerrain.keys.size > 15) {
@@ -127,7 +128,9 @@ class LiveDataObserver(private val parent: Main): Listener {
                     else -> null
                 } ?: return@associate connection to null
 
-                val new = TerrainSurfaceGenerator.generate(parent, world, payload.scale, payload.center, payload.limit)
+                val new = parent.mutex.withLock {
+                    TerrainSurfaceGenerator.generate(parent, world, payload.scale, payload.center, payload.limit)
+                }
 
                 if (cache.onTerrain[payload] == new) return@associate connection to null
 
