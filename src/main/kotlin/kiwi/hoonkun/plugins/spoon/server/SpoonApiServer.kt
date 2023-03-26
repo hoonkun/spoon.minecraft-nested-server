@@ -184,5 +184,8 @@ suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
         return
     }
 
-    call.respond(TerrainSurfaceGenerator.generate(parent, world, data.scale, data.center, data.limit))
+    val response = TerrainSurfaceGenerator.generate(parent, world, data.scale, data.center, data.limit)
+
+    parent.observer.cache.onTerrain[data] = response
+    call.respond(response)
 }

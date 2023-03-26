@@ -54,7 +54,7 @@ class LiveDataObserver(private val parent: Main): Listener {
 
     private val delays = LiveDataDelays()
 
-    private val cache = LiveDataCache()
+    val cache = LiveDataCache()
 
     private var state = "idle"
 

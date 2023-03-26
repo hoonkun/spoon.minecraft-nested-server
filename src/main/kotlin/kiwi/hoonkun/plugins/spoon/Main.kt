@@ -43,7 +43,7 @@ class Main : JavaPlugin() {
     val theNether get() = server.worlds.find { it.environment == World.Environment.NETHER }
     val theEnd get() = server.worlds.find { it.environment == World.Environment.THE_END }
 
-    private val observer = LiveDataObserver(this)
+    val observer = LiveDataObserver(this)
 
     override fun onEnable() {
         super.onEnable()
