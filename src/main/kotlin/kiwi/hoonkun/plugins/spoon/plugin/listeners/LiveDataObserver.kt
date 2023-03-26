@@ -12,7 +12,6 @@ import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOfflinePlayer
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOnlinePlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -20,6 +19,7 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerTeleportEvent
+import kotlin.concurrent.fixedRateTimer
 import kotlin.math.absoluteValue
 
 class LiveDataDelays {
@@ -33,11 +33,24 @@ class LiveDataCache {
     var onDaylightCycle: Long = 0L
     val onPlayerHealth = mutableMapOf<String, Double>()
     val onPlayerExp = mutableMapOf<String, Pair<Int, Float>>()
+    val onTerrain = mutableMapOf<TerrainRequest, TerrainResponse>()
 }
 
 class LiveDataObserver(private val parent: Main): Listener {
 
     private val scope = CoroutineScope(Dispatchers.IO)
+    private val heavyScope = CoroutineScope(Dispatchers.IO)
+    private val thread = Thread {
+        fixedRateTimer(name = "heavy", period = 3000) {
+            val responses = observeTerrain()
+            heavyScope.launch {
+                responses.forEach { (connection, response) ->
+                    if (response != null)
+                        connection.session.sendSerialized(TerrainSubscriptionData(type = "Terrain", terrain = response))
+                }
+            }
+        }
+    }
 
     private val delays = LiveDataDelays()
 
@@ -47,20 +60,14 @@ class LiveDataObserver(private val parent: Main): Listener {
 
     fun observe() {
         state = "observing"
-        scope.launch {
-            while (state == "observing") {
+        fixedRateTimer(name = "default", period = 500) {
+            scope.launch {
                 observeTime()
                 observeHealth()
                 observeExp()
-                delay(500)
             }
         }
-        scope.launch {
-            while (state == "observing") {
-                observeTerrain()
-                delay(750)
-            }
-        }
+        thread.start()
     }
 
     private suspend fun observeTime() {
@@ -95,31 +102,45 @@ class LiveDataObserver(private val parent: Main): Listener {
         }
     }
 
-    private suspend fun observeTerrain() {
-        val cached = mutableMapOf<String, TerrainResponse>()
-        parent.subscribers(LiveDataType.Terrain).mapNotNull { conn -> conn.extras[LiveDataType.Terrain]?.let { conn to it } }
-            .forEach { (connection, extra) ->
-                val already = cached[extra]
+    private fun observeTerrain(): Map<Connection, TerrainResponse?> {
+        val cached = mutableMapOf<TerrainRequest, TerrainResponse>()
+
+        if (cache.onTerrain.keys.size > 15) {
+            cache.onTerrain.clear()
+        }
+
+        return parent.subscribers(LiveDataType.Terrain).mapNotNull { conn -> conn.extras[LiveDataType.Terrain]?.let { conn to it } }
+            .associate { (connection, extra) ->
+                val payload = Json.decodeFromString<TerrainRequest>(extra)
+
+                val already = cached[payload]
                 if (already != null) {
-                    connection.session.sendSerialized(already)
-                    return
+                    if (cache.onTerrain[payload] == already)
+                        return@associate connection to null
+                    return@associate connection to already
                 }
 
-                val payload = Json.decodeFromString<TerrainRequest>(extra)
                 val world = when (payload.environment) {
                     "overworld" -> parent.overworld
                     "the_nether" -> parent.theNether
                     "the_end" -> parent.theEnd
                     else -> null
-                } ?: return
+                } ?: return@associate connection to null
+
                 val new = TerrainSurfaceGenerator.generate(parent, world, payload.scale, payload.center, payload.limit)
-                connection.session.sendSerialized(TerrainSubscriptionData(type = "Terrain", terrain = new))
-                cached[extra] = new
+
+                if (cache.onTerrain[payload] == new) return@associate connection to null
+
+                cache.onTerrain[payload] = new
+                cached[payload] = new
+
+                connection to new
             }
     }
 
     fun unobserve() {
         state = "idle"
+        thread.interrupt()
     }
 
     @EventHandler
