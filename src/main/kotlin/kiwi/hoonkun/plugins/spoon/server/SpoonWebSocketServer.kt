@@ -26,11 +26,11 @@ class Connection(val session: DefaultWebSocketServerSession) {
 
     suspend fun initialData(parent: Main, which: String) {
         when (which) {
-            LiveDataType.PlayerMove -> {
+            LiveDataType.PlayerLocation -> {
                 parent.server.onlinePlayers.forEach {
                     session.sendSerialized(
                         PlayerMoveData(
-                            type = LiveDataType.PlayerMove,
+                            type = LiveDataType.PlayerLocation,
                             playerId = it.playerProfile.uniqueId.toString(),
                             location = listOf(it.location.x, it.location.y, it.location.z),
                             environment = it.location.world?.environment.spoon()
@@ -48,7 +48,7 @@ class Connection(val session: DefaultWebSocketServerSession) {
 
 class LiveDataType {
     companion object {
-        const val PlayerMove = "PlayerMove"
+        const val PlayerLocation = "PlayerLocation"
         const val PlayerConnect = "PlayerConnect"
         const val PlayerDisconnect = "PlayerDisconnect"
         const val DaylightCycle = "DaylightCycle"

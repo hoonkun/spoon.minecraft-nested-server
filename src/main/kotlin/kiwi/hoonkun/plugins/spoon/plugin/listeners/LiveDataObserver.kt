@@ -23,7 +23,7 @@ import org.bukkit.event.player.PlayerTeleportEvent
 import kotlin.math.absoluteValue
 
 class LiveDataDelays {
-    val onPlayerMove = mutableMapOf<String, Long>()
+    val onPlayerLocation = mutableMapOf<String, Long>()
 }
 
 class LiveDataCache {
@@ -137,17 +137,17 @@ class LiveDataObserver(private val parent: Main): Listener {
     }
 
     @EventHandler
-    fun onPlayerMove(event: PlayerMoveEvent) {
+    fun onPlayerLocation(event: PlayerMoveEvent) {
         val current = System.currentTimeMillis()
         val playerUID = event.player.uniqueId.toString()
-        if (current - (delays.onPlayerMove[playerUID] ?: 0) < 150) return
+        if (current - (delays.onPlayerLocation[playerUID] ?: 0) < 150) return
 
         val location = event.player.location
 
         if (cache.onPlayerMove[playerUID].let { it != null && it.location[0] == location.x && it.location[1] == location.z }) return
 
         val data = PlayerMoveData(
-            type = LiveDataType.PlayerMove,
+            type = LiveDataType.PlayerLocation,
             playerId = playerUID,
             location = listOf(location.x, location.y, location.z),
             environment = location.world?.environment.spoon()
@@ -155,10 +155,10 @@ class LiveDataObserver(private val parent: Main): Listener {
 
         cache.onPlayerMove[playerUID] = data
 
-        delays.onPlayerMove[playerUID] = current
+        delays.onPlayerLocation[playerUID] = current
 
         scope.launch {
-            parent.subscribers(LiveDataType.PlayerMove).forEach { it.session.sendSerialized(data) }
+            parent.subscribers(LiveDataType.PlayerLocation).forEach { it.session.sendSerialized(data) }
         }
     }
 
@@ -166,14 +166,14 @@ class LiveDataObserver(private val parent: Main): Listener {
     fun onPlayerTeleport(event: PlayerTeleportEvent) {
         val location = event.to ?: return
         val data = PlayerMoveData(
-            type = LiveDataType.PlayerMove,
+            type = LiveDataType.PlayerLocation,
             playerId = event.player.playerProfile.uniqueId.toString(),
             location = listOf(location.x, location.y, location.z),
             environment = location.world?.environment.spoon()
         )
 
         scope.launch {
-            parent.subscribers(LiveDataType.PlayerMove).forEach { it.session.sendSerialized(data) }
+            parent.subscribers(LiveDataType.PlayerLocation).forEach { it.session.sendSerialized(data) }
         }
     }
 
