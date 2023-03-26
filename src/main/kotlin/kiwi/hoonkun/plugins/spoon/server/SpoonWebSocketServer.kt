@@ -24,30 +24,34 @@ class Connection(val session: DefaultWebSocketServerSession) {
     val subscribed = mutableSetOf<String>()
     val extras = mutableMapOf<String, String?>()
 
-    suspend fun initialData(parent: Main, which: String) {
+    suspend fun initialData(parent: Main, which: String, extra: String?) {
         when (which) {
             LiveDataType.PlayerLocation -> {
-                parent.server.onlinePlayers.forEach {
-                    session.sendSerialized(
-                        PlayerMoveData(
-                            type = LiveDataType.PlayerLocation,
-                            playerId = it.playerProfile.uniqueId.toString(),
-                            location = listOf(it.location.x, it.location.y, it.location.z),
-                            environment = it.location.world?.environment.spoon()
+                parent.server.onlinePlayers
+                    .find { it.playerProfile.uniqueId.toString() == extra }
+                    ?.let {
+                        session.sendSerialized(
+                            PlayerMoveData(
+                                type = LiveDataType.PlayerLocation,
+                                playerId = it.playerProfile.uniqueId.toString(),
+                                location = listOf(it.location.x, it.location.y, it.location.z),
+                                environment = it.location.world?.environment.spoon()
+                            )
                         )
-                    )
-                }
+                    }
             }
             LiveDataType.PlayerView -> {
-                parent.server.onlinePlayers.forEach {
-                    session.sendSerialized(
-                        PlayerViewData(
-                            type = LiveDataType.PlayerLocation,
-                            playerId = it.playerProfile.uniqueId.toString(),
-                            yaw = it.location.yaw
+                parent.server.onlinePlayers
+                    .find { it.playerProfile.uniqueId.toString() == extra }
+                    ?.let {
+                        session.sendSerialized(
+                            PlayerViewData(
+                                type = LiveDataType.PlayerView,
+                                playerId = it.playerProfile.uniqueId.toString(),
+                                yaw = it.location.yaw
+                            )
                         )
-                    )
-                }
+                    }
             }
             LiveDataType.DaylightCycle -> {
                 val overworld = parent.overworld ?: return
@@ -132,7 +136,7 @@ fun Application.websocketServer(parent: Main) {
                             thisConnection.subscribed.remove(request.which)
                         }
                         "initial_data_request" -> {
-                            thisConnection.initialData(parent, request.which)
+                            thisConnection.initialData(parent, request.which, request.extra)
                         }
                     }
                 }
