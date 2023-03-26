@@ -1,5 +1,6 @@
 package kiwi.hoonkun.plugins.spoon.server.structures
 
+import kiwi.hoonkun.plugins.spoon.extensions.spoon
 import kotlinx.serialization.Serializable
 import org.bukkit.Location
 import org.bukkit.OfflinePlayer
@@ -10,11 +11,12 @@ import org.bukkit.entity.Player
 data class SpoonLocation(
     val x: Double,
     val y: Double,
-    val z: Double
+    val z: Double,
+    val environment: String
 ) {
     companion object {
         fun bukkit(it: Location): SpoonLocation =
-            SpoonLocation(it.x, it.y, it.z)
+            SpoonLocation(it.x, it.y, it.z, it.world?.environment.spoon())
     }
 }
 

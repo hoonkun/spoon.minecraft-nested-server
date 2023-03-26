@@ -167,7 +167,7 @@ class LiveDataObserver(private val parent: Main): Listener {
 
         val location = event.player.location
 
-        if (cache.onPlayerMove[playerUID].let { it != null && it.location[0] == location.x && it.location[1] == location.z }) return
+        if (cache.onPlayerMove[playerUID].let { it != null && it.location[0] == location.x && it.location[1] == location.y && it.location[2] == location.z }) return
 
         val data = PlayerMoveData(
             type = LiveDataType.PlayerLocation,
