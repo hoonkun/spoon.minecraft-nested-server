@@ -6,7 +6,6 @@ import kiwi.hoonkun.plugins.spoon.server.TerrainData
 import kiwi.hoonkun.plugins.spoon.server.TerrainRequestLocation
 import kiwi.hoonkun.plugins.spoon.server.TerrainResponse
 import org.bukkit.ChunkSnapshot
-import org.bukkit.HeightMap
 import org.bukkit.Material
 import org.bukkit.World
 import kotlin.math.absoluteValue
@@ -24,6 +23,25 @@ class TerrainSurfaceGenerator {
                     result++
                 }
                 result
+            }
+
+            val isValidBlock: (Material) -> Boolean = { (it.isSolid || it == Material.WATER || it == Material.LAVA) && !it.isAir }
+            val isValidNonWaterBlock: (Material) -> Boolean = { (it.isSolid || it == Material.LAVA) && !it.isAir && it != Material.WATER }
+
+            val getHighestValidBlock: (ChunkSnapshot, Int, Int, Int) -> Pair<Material, Int> = lambda@ { chunk, x, initialY, z ->
+                if (initialY < 0) return@lambda Material.AIR to -1
+                var resultType = chunk.getBlockType(x, initialY, z)
+                var resultY = initialY
+                while (!isValidBlock(resultType)) {
+                    resultType = chunk.getBlockType(x, --resultY, z)
+                }
+                if (resultType == Material.WATER) {
+                    var nonWaterType = resultType
+                    while (!isValidNonWaterBlock(nonWaterType)) {
+                        nonWaterType = chunk.getBlockType(x, --resultY, z)
+                    }
+                }
+                resultType to resultY
             }
 
             val radius = scale / 2
@@ -53,54 +71,35 @@ class TerrainSurfaceGenerator {
 
             var hasRemainingYLimitedData = false
 
-            val addBlockY: (Material, Int, Int, Int) -> Unit = { material, x, y, z ->
-                if (material.key.key == "water") blockYs.add(world.getHighestBlockAt(x, z, HeightMap.OCEAN_FLOOR).y)
-                else blockYs.add(y)
-            }
-
             val chunks = mutableMapOf<Pair<Int, Int>, ChunkSnapshot>()
 
             ((fromX until toX) to (fromZ until toZ)).forEach block@ { x, z ->
                 val chunkX = (x / 16).let { if (x >= 0) it else it - 1 }
                 val chunkZ = (z / 16).let { if (z >= 0) it else it - 1 }
 
+                val blockX = (x % 16).absoluteValue.let { if (x < 0) 15 - it else it }
+                val blockZ = (z % 16).absoluteValue.let { if (z < 0) 15 - it else it }
+
                 val chunk = chunks.getOrPut(chunkX to chunkZ) { world.getChunkAt(chunkX, chunkZ).chunkSnapshot }
-                val chunkBlockX = (x % 16).absoluteValue.let { if (x < 0) 15 - it else it }
-                val chunkBlockZ = (z % 16).absoluteValue.let { if (z < 0) 15 - it else it }
 
-                val highestY = chunk.getHighestBlockYAt(chunkBlockX, chunkBlockZ)
-                if (highestY == -1) {
-                    blockKeys.add("air")
-                    addBlockY(Material.AIR, x, -1, z)
-                    return@block
-                }
-                val highest = chunk.getBlockType(chunkBlockX, highestY, chunkBlockZ)
+                val (highestBlock, highestY) = getHighestValidBlock(chunk, blockX, chunk.getHighestBlockYAt(blockX, blockZ), blockZ)
 
-                if (limit == null) {
-                    blockKeys.add(highest.key.key)
-                    addBlockY(highest, x, highestY, z)
-                    return@block
-                }
+                if (limit == null || highestY < limit) {
+                    blockKeys.add(highestBlock.key.key)
+                    blockYs.add(highestY)
 
-                if (highestY < limit) {
-                    blockKeys.add(highest.key.key)
-                    addBlockY(highest, x, highestY, z)
                     setYNotLimited()
                 } else {
-                    var y = limit
-                    var block = chunk.getBlockType(chunkBlockX, y, chunkBlockZ)
+                    val (limitedHighestBlock, limitedHighestY) = getHighestValidBlock(chunk, blockX, limit, blockZ)
 
-                    val validBlock: (Material) -> Boolean = { (it.isSolid || it == Material.WATER || it == Material.LAVA) && !it.isAir }
+                    blockKeys.add(limitedHighestBlock.key.key)
+                    blockYs.add(limitedHighestY)
 
-                    if (validBlock(block)) setYLimited()
-                    else setYNotLimited()
-
-                    while (!validBlock(block) && y >= 0) {
-                        block = chunk.getBlockType(chunkBlockX, --y, chunkBlockZ)
+                    if (limitedHighestY == limit) {
+                        setYLimited()
+                    } else {
+                        setYNotLimited()
                     }
-
-                    blockKeys.add(block.key.key)
-                    addBlockY(block, x, y, z)
                 }
 
                 hasRemainingYLimitedData = true
@@ -131,20 +130,6 @@ class TerrainSurfaceGenerator {
 
             var hasRemainingShadowData = false
 
-            val setBlockShadowed = {
-                shadowDataBits = shadowDataBits shl 2
-                shadowDataBits = shadowDataBits or 1
-            }
-
-            val setBlockLighted = {
-                shadowDataBits = shadowDataBits shl 2
-                shadowDataBits = shadowDataBits or 2
-            }
-
-            val setBlockNotShadowed = {
-                shadowDataBits = shadowDataBits shl 2
-            }
-
             for (index in 0 until blockKeys.size) {
                 val key = blockKeys[index]
                 val y = blockYs[index]
@@ -166,9 +151,15 @@ class TerrainSurfaceGenerator {
                 }
 
                 val aboveYIndex = if (index % (16 * scale) == 0) -1 else index - 1
-                if (aboveYIndex < 0 || blockYs[aboveYIndex] > y) setBlockShadowed()
-                else if (blockYs[aboveYIndex] < y) setBlockLighted()
-                else setBlockNotShadowed()
+                if (aboveYIndex < 0 || blockYs[aboveYIndex] > y) {
+                    shadowDataBits = shadowDataBits shl 2
+                    shadowDataBits = shadowDataBits or 1
+                } else if (blockYs[aboveYIndex] < y) {
+                    shadowDataBits = shadowDataBits shl 2
+                    shadowDataBits = shadowDataBits or 2
+                } else {
+                    shadowDataBits = shadowDataBits shl 2
+                }
 
                 shadowDataBitIndex += 2
                 hasRemainingShadowData = true
