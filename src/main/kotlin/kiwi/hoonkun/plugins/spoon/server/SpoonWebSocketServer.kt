@@ -24,7 +24,12 @@ class Connection(val session: DefaultWebSocketServerSession) {
     val subscribed = mutableSetOf<String>()
     val extras = mutableMapOf<String, String?>()
 
+    var authorized = false
+    var username: String? = null
+
     suspend fun initialData(parent: Main, which: String, extra: String?) {
+        if (!authorized) return
+
         when (which) {
             LiveDataType.PlayerLocation -> {
                 parent.server.onlinePlayers
@@ -72,6 +77,7 @@ class LiveDataType {
         const val PlayerExp = "PlayerExp"
         const val PlayerGameMode = "PlayerGameMode"
         const val Terrain = "Terrain"
+        const val CommandResponse = "CommandResponse"
     }
 }
 
@@ -107,6 +113,9 @@ data class PlayerGameModeData(val type: String, val playerId: String, val gameMo
 
 @Serializable
 data class TerrainSubscriptionData(val type: String, val terrain: TerrainResponse)
+
+@Serializable
+data class RunCommandResponse(val type: String, val response: String)
 
 fun Application.websocketServer(parent: Main) {
     install(WebSockets) {

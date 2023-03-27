@@ -10,6 +10,7 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kiwi.hoonkun.plugins.spoon.Main
+import kiwi.hoonkun.plugins.spoon.plugin.ConsoleFilter
 import kiwi.hoonkun.plugins.spoon.plugin.core.TerrainSurfaceGenerator
 import kiwi.hoonkun.plugins.spoon.server.auth.respondJWT
 import kiwi.hoonkun.plugins.spoon.server.structures.SpoonOfflinePlayer
@@ -20,6 +21,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import org.bukkit.Bukkit
 import org.bukkit.World.Environment
 import java.io.BufferedReader
 import java.io.ByteArrayOutputStream
@@ -45,6 +47,7 @@ fun Application.apiServer(parent: Main) {
             post("$prefix/terrain") { terrain(parent) }
             get("$prefix/logs") { logs(parent) }
             get("$prefix/server-properties") { serverProperties(parent) }
+            put("/auth/livedata") { authorizeLiveData(parent) }
         }
     }
 }
@@ -73,8 +76,11 @@ suspend fun PipelineContext<Unit, ApplicationCall>.offlinePlayers(parent: Main) 
 data class RunCommandRequest(val command: String)
 suspend fun PipelineContext<Unit, ApplicationCall>.runCommand(parent: Main) {
     val data = call.receive<RunCommandRequest>()
+    val principal = call.principal<JWTPrincipal>()
     parent.server.scheduler.runTask(parent, Runnable {
-        parent.server.dispatchCommand(parent.server.consoleSender, data.command)
+        ConsoleFilter.owner = principal!!.payload.claims.getValue("username").asString()
+        ConsoleFilter.pending++
+        Bukkit.dispatchCommand(parent.server.consoleSender, data.command)
     })
     call.respond(HttpStatusCode.OK)
 }
@@ -196,4 +202,15 @@ suspend fun PipelineContext<Unit, ApplicationCall>.terrain(parent: Main) {
 
     parent.observer.cache.onTerrain[data] = response
     call.respond(response)
+}
+
+@Serializable
+data class LiveDataAuthorizeRequest(val name: String)
+
+suspend fun PipelineContext<Unit, ApplicationCall>.authorizeLiveData(parent: Main) {
+    val data = call.receive<LiveDataAuthorizeRequest>()
+    val target = parent.spoonSocketConnections.find { it.name == data.name }
+    target?.authorized = true
+    target?.username = call.principal<JWTPrincipal>()!!.payload.claims.getValue("username").asString()
+    call.respond(HttpStatusCode.OK)
 }

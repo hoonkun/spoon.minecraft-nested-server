@@ -91,7 +91,7 @@ class Main : JavaPlugin() {
     }
 
     fun subscribers(which: String): List<Connection> {
-        return spoonSocketConnections.filter { it.subscribed.contains(which) }
+        return spoonSocketConnections.filter { it.authorized && it.subscribed.contains(which) }
     }
 
 }
