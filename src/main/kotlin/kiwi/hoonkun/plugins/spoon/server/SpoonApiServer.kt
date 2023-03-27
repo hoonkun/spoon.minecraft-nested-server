@@ -44,6 +44,7 @@ fun Application.apiServer(parent: Main) {
             post("$prefix/run") { runCommand(parent) }
             post("$prefix/terrain") { terrain(parent) }
             get("$prefix/logs") { logs(parent) }
+            get("$prefix/server-properties") { serverProperties(parent) }
         }
     }
 }
@@ -155,6 +156,10 @@ data class InternalEncodedProfile(
 data class InternalEncodedProfileTextures(
     val SKIN: Map<String, String>
 )
+
+suspend fun PipelineContext<Unit, ApplicationCall>.serverProperties(parent: Main) {
+    call.respond(parent.properties)
+}
 
 @Serializable
 data class TerrainRequestLocation(val x: Int, val z: Int)

@@ -29,6 +29,7 @@ import kotlin.collections.LinkedHashSet
 
 class Main : JavaPlugin() {
 
+    val properties = parseProperties(File("${dataFolder.absoluteFile.parentFile.parentFile.absolutePath}/server.properties"))
     val configurations = parseConfiguration(File("${dataFolder.absolutePath}/.config.env"))
     val resources = parseResources()
     val users = parseUser(File("${dataFolder.absolutePath}/.user.json")).toMutableList()
@@ -126,6 +127,17 @@ data class SpoonConfiguration(
     val secret: String,
     val host: String
 )
+
+fun parseProperties(configFile: File): Map<String, String> {
+    if (!configFile.exists()) throw Exception("server.properties not found! Is plugin jar located in correct spigot plugin directory?")
+
+    val text = configFile.readText()
+    return text
+        .split("\n")
+        .filter { it.isNotEmpty() && it.isNotBlank() }
+        .filter { !it.startsWith("#") }
+        .associate { line -> line.split("=", limit = 2).let { it[0] to it[1] } }
+}
 
 fun parseConfiguration(configFile: File): SpoonConfiguration {
     if (!configFile.exists()) throw Exception("config file not exists, which must be located in ${configFile.absolutePath}")
