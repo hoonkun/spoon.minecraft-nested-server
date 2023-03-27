@@ -43,7 +43,7 @@ class ConsoleFilter(private val parent: Main) : Filter {
             parent.subscribers(LiveDataType.CommandResponse)
                 .find { it.username == owner }
                 ?.session
-                ?.sendSerialized(RunCommandResponse(LiveDataType.CommandResponse, response))
+                ?.sendSerialized(RunCommandResponse(LiveDataType.CommandResponse, response.replaceFirst("[Not Secure]", "")))
         }
     }
 
