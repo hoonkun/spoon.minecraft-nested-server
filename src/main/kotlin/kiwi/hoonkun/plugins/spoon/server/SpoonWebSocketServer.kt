@@ -79,7 +79,7 @@ class LiveDataType {
 data class SocketInitializeResponse(val type: String, val identifier: String)
 
 @Serializable
-data class LiveDataSubscribeRequest(val which: String, val operation: String, val extra: String? = null)
+data class LiveDataSubscribeRequest(val which: List<String>, val operation: String, val extra: Map<String, String>? = null)
 
 @Serializable
 data class PlayerMoveData(val type: String, val playerId: String, val location: List<Double>, val environment: String)
@@ -129,14 +129,14 @@ fun Application.websocketServer(parent: Main) {
                     val request = Json.decodeFromString<LiveDataSubscribeRequest>(frame.readText())
                     when (request.operation) {
                         "subscribe" -> {
-                            thisConnection.subscribed.add(request.which)
-                            thisConnection.extras[request.which] = request.extra
+                            thisConnection.subscribed.addAll(request.which)
+                            request.which.forEach { thisConnection.extras[it] = request.extra?.get(it) }
                         }
                         "unsubscribe" -> {
-                            thisConnection.subscribed.remove(request.which)
+                            thisConnection.subscribed.removeAll(request.which.toSet())
                         }
                         "initial_data_request" -> {
-                            thisConnection.initialData(parent, request.which, request.extra)
+                            request.which.forEach { thisConnection.initialData(parent, it, request.extra?.get(it)) }
                         }
                     }
                 }
