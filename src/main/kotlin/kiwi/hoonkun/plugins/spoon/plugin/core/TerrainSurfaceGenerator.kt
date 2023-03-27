@@ -50,7 +50,8 @@ class TerrainSurfaceGenerator {
             val fromZ = (center.z - radius) * 16
             val toZ = (center.z + radius + 1) * 16
 
-            val blockKeys = mutableListOf<String>()
+            val blockKeySet = mutableSetOf<String>()
+            val blockIndexes = mutableListOf<Int>()
             val blockYs = mutableListOf<Int>()
 
             val blockLongs = mutableListOf<Long>()
@@ -85,14 +86,16 @@ class TerrainSurfaceGenerator {
                 val (highestBlock, highestY) = getHighestValidBlock(chunk, blockX, chunk.getHighestBlockYAt(blockX, blockZ), blockZ)
 
                 if (limit == null || highestY < limit) {
-                    blockKeys.add(highestBlock.key.key)
+                    blockKeySet.add(highestBlock.key.key)
+                    blockIndexes.add(blockKeySet.indexOf(highestBlock.key.key))
                     blockYs.add(highestY)
 
                     setYNotLimited()
                 } else {
                     val (limitedHighestBlock, limitedHighestY) = getHighestValidBlock(chunk, blockX, limit, blockZ)
 
-                    blockKeys.add(limitedHighestBlock.key.key)
+                    blockKeySet.add(limitedHighestBlock.key.key)
+                    blockIndexes.add(blockKeySet.indexOf(limitedHighestBlock.key.key))
                     blockYs.add(limitedHighestY)
 
                     if (limitedHighestY == limit) {
@@ -115,7 +118,7 @@ class TerrainSurfaceGenerator {
 
             if (hasRemainingYLimitedData) yLimitedLongs.add(yLimitedDataBits)
 
-            val palette = blockKeys.toSet().toList()
+            val palette = blockKeySet.toList()
             val colors = palette.map { parent.resources.blockColors[it] }
 
             val bitsPerBlock = calcBitsPerBlock(palette.size)
@@ -130,11 +133,9 @@ class TerrainSurfaceGenerator {
 
             var hasRemainingShadowData = false
 
-            for (index in 0 until blockKeys.size) {
-                val key = blockKeys[index]
+            for (index in 0 until blockIndexes.size) {
+                val paletteIndex = blockIndexes[index].toLong()
                 val y = blockYs[index]
-
-                val paletteIndex = palette.indexOf(key).toLong()
 
                 blockDataBits = blockDataBits shl bitsPerBlock
                 blockDataBits = blockDataBits or paletteIndex

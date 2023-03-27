@@ -41,13 +41,27 @@ class LiveDataObserver(private val parent: Main): Listener {
 
     private val scope = CoroutineScope(Dispatchers.IO)
 
-    private val thread = Thread {
+    private val defaultObservingThread = Thread {
+        fixedRateTimer(name = "default-rapid", period = 500) {
+            CoroutineScope(Dispatchers.Default).launch {
+                observeHealth()
+                observeExp()
+            }
+        }
+        fixedRateTimer(name = "default-normal", period = 5000) {
+            CoroutineScope(Dispatchers.Default).launch {
+                observeTime()
+            }
+        }
+    }
+    private val heavyObservingThread = Thread {
         fixedRateTimer(name = "heavy", period = 3000) {
-            CoroutineScope(Dispatchers.IO).launch {
+            CoroutineScope(Dispatchers.Default).launch {
                 val responses = observeTerrain()
                 responses.forEach { (connection, response) ->
-                    if (response != null)
-                        connection.session.sendSerialized(TerrainSubscriptionData(type = "Terrain", terrain = response))
+                    response?.let {
+                        connection.session.sendSerialized(TerrainSubscriptionData(type = "Terrain", terrain = it))
+                    }
                 }
             }
         }
@@ -57,23 +71,14 @@ class LiveDataObserver(private val parent: Main): Listener {
 
     val cache = LiveDataCache()
 
-    private var state = "idle"
-
     fun observe() {
-        state = "observing"
-        fixedRateTimer(name = "default", period = 500) {
-            scope.launch {
-                observeTime()
-                observeHealth()
-                observeExp()
-            }
-        }
-        thread.start()
+        defaultObservingThread.start()
+        heavyObservingThread.start()
     }
 
     private suspend fun observeTime() {
         val overworld = parent.overworld ?: return
-        if ((cache.onDaylightCycle - overworld.time).absoluteValue > 20) {
+        if ((cache.onDaylightCycle - overworld.time).absoluteValue > 120) {
             parent.subscribers(LiveDataType.DaylightCycle)
                 .forEach { it.session.sendSerialized(DaylightCycleData(type = LiveDataType.DaylightCycle, time = overworld.time)) }
         }
@@ -142,8 +147,8 @@ class LiveDataObserver(private val parent: Main): Listener {
     }
 
     fun unobserve() {
-        state = "idle"
-        thread.interrupt()
+        defaultObservingThread.interrupt()
+        heavyObservingThread.interrupt()
     }
 
     @EventHandler
