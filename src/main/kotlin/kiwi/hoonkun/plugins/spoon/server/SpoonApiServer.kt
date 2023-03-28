@@ -41,12 +41,12 @@ fun Application.apiServer(parent: Main) {
             get("$prefix/players/online") { onlinePlayers(parent) }
             get("$prefix/players/offline") { offlinePlayers(parent) }
             get("$prefix/players/graphic/{userId}") { userSkin(parent) }
+            post("$prefix/terrain") { terrain(parent) }
+            get("$prefix/server-properties") { serverProperties(parent) }
         }
         authenticate {
             post("$prefix/run") { runCommand(parent) }
-            post("$prefix/terrain") { terrain(parent) }
             get("$prefix/logs") { logs(parent) }
-            get("$prefix/server-properties") { serverProperties(parent) }
             put("/auth/livedata") { authorizeLiveData(parent) }
         }
     }

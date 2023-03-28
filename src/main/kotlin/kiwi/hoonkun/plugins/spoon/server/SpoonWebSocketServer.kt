@@ -28,7 +28,7 @@ class Connection(val session: DefaultWebSocketServerSession) {
     var username: String? = null
 
     suspend fun initialData(parent: Main, which: String, extra: String?) {
-        if (!authorized) return
+        if (which == LiveDataType.Terrain && !authorized) return
 
         when (which) {
             LiveDataType.PlayerLocation -> {

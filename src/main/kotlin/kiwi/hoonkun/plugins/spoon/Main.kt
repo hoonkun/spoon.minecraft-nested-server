@@ -90,8 +90,8 @@ class Main : JavaPlugin() {
         (LogManager.getRootLogger() as Logger).addFilter(ConsoleFilter(this))
     }
 
-    fun subscribers(which: String): List<Connection> {
-        return spoonSocketConnections.filter { it.authorized && it.subscribed.contains(which) }
+    fun subscribers(which: String, authorizedOnly: Boolean = false): List<Connection> {
+        return spoonSocketConnections.filter { (!authorizedOnly || it.authorized) && it.subscribed.contains(which) }
     }
 
 }

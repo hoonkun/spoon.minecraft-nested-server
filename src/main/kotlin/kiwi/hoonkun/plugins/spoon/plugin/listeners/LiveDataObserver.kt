@@ -115,7 +115,8 @@ class LiveDataObserver(private val parent: Main): Listener {
             cache.onTerrain.clear()
         }
 
-        return parent.subscribers(LiveDataType.Terrain).mapNotNull { conn -> conn.extras[LiveDataType.Terrain]?.let { conn to it } }
+        return parent.subscribers(LiveDataType.Terrain, true)
+            .mapNotNull { conn -> conn.extras[LiveDataType.Terrain]?.let { conn to it } }
             .associate { (connection, extra) ->
                 val payload = Json.decodeFromString<TerrainRequest>(extra)
 
