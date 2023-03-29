@@ -13,6 +13,7 @@ import kiwi.hoonkun.plugins.spoon.plugin.listeners.LiveDataObserver
 import kiwi.hoonkun.plugins.spoon.server.*
 import kiwi.hoonkun.plugins.spoon.server.auth.jwtAuthentication
 import kiwi.hoonkun.plugins.spoon.server.structures.User
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -45,9 +46,10 @@ class Main : JavaPlugin() {
     val theNether get() = server.worlds.find { it.environment == World.Environment.NETHER }
     val theEnd get() = server.worlds.find { it.environment == World.Environment.THE_END }
 
-    val observer = LiveDataObserver(this)
-
     val mutex = Mutex()
+    val job = Job()
+
+    val observer = LiveDataObserver(this)
 
     override fun onEnable() {
         super.onEnable()
@@ -63,6 +65,7 @@ class Main : JavaPlugin() {
         super.onDisable()
 
         observer.unobserve()
+        job.cancel()
         spoon.stop()
     }
 

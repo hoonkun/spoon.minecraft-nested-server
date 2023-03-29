@@ -20,6 +20,7 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerTeleportEvent
+import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import kotlin.math.absoluteValue
 
@@ -39,23 +40,27 @@ class LiveDataCache {
 
 class LiveDataObserver(private val parent: Main): Listener {
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(Dispatchers.IO + parent.job)
+
+    private lateinit var defaultRapidTimer: Timer
+    private lateinit var defaultNormalTimer: Timer
+    private lateinit var heavyTimer: Timer
 
     private val defaultObservingThread = Thread {
-        fixedRateTimer(name = "default-rapid", period = 500) {
+        defaultRapidTimer = fixedRateTimer(name = "default-rapid", period = 500) {
             CoroutineScope(Dispatchers.Default).launch {
                 observeHealth()
                 observeExp()
             }
         }
-        fixedRateTimer(name = "default-normal", period = 5000) {
+        defaultNormalTimer = fixedRateTimer(name = "default-normal", period = 5000) {
             CoroutineScope(Dispatchers.Default).launch {
                 observeTime()
             }
         }
     }
     private val heavyObservingThread = Thread {
-        fixedRateTimer(name = "heavy", period = 3000) {
+        heavyTimer = fixedRateTimer(name = "heavy", period = 3000) {
             CoroutineScope(Dispatchers.Default).launch {
                 val responses = observeTerrain()
                 responses.forEach { (connection, response) ->
@@ -148,6 +153,10 @@ class LiveDataObserver(private val parent: Main): Listener {
     }
 
     fun unobserve() {
+        if (::defaultNormalTimer.isInitialized) defaultNormalTimer.cancel()
+        if (::defaultRapidTimer.isInitialized) defaultRapidTimer.cancel()
+        if (::heavyTimer.isInitialized) heavyTimer.cancel()
+
         defaultObservingThread.interrupt()
         heavyObservingThread.interrupt()
     }
