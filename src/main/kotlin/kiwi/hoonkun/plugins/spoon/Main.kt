@@ -153,7 +153,7 @@ fun parseConfiguration(configFile: File): SpoonConfiguration {
 
     return SpoonConfiguration(
         secret = dict.getValue("secret"),
-        host = "http://${dict.getValue("host")}:25566"
+        host = "${dict.getValue("protocol")}://${dict.getValue("host")}:25566"
     )
 }
 
