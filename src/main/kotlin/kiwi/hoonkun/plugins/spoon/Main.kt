@@ -119,6 +119,7 @@ fun Application.spoon(parent: Main) {
 
     jwtAuthentication(parent.configurations)
 
+    frontendServer()
     apiServer(parent)
     websocketServer(parent)
 }
