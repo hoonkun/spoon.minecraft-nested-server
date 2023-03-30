@@ -37,7 +37,7 @@ class Main : JavaPlugin() {
 
     val logs = mutableListOf<SpoonLog>()
 
-    private val spoon = embeddedServer(Netty, port = 25566, module = { spoon(this@Main) })
+    private val spoon = embeddedServer(Netty, port = configurations.port, module = { spoon(this@Main) })
     val spoonSocketConnections: MutableSet<Connection> = Collections.synchronizedSet(LinkedHashSet())
 
     private val userExecutor = UserExecutor(this)
@@ -117,7 +117,7 @@ fun Application.spoon(parent: Main) {
         allowNonSimpleContentTypes = true
         allowCredentials = true
         allowSameOrigin = true
-        anyHost() // FIXME: 언젠가 수정합시다 이거
+        allowHost(parent.configurations.hostname, listOf("https", "http"))
     }
 
     jwtAuthentication(parent.configurations)
@@ -129,7 +129,9 @@ fun Application.spoon(parent: Main) {
 
 data class SpoonConfiguration(
     val secret: String,
-    val host: String
+    val hostURL: String,
+    val hostname: String,
+    val port: Int
 )
 
 fun parseProperties(configFile: File): Map<String, String> {
@@ -151,9 +153,15 @@ fun parseConfiguration(configFile: File): SpoonConfiguration {
         .filter { it.isNotEmpty() }
         .associate { line -> line.split("=", limit = 2).let { it[0] to it[1] } }
 
+    val protocol = dict.getValue("protocol")
+    val hostname = dict.getValue("host")
+    val port = dict.getValue("port").toIntOrNull() ?: 25566
+
     return SpoonConfiguration(
         secret = dict.getValue("secret"),
-        host = "${dict.getValue("protocol")}://${dict.getValue("host")}:25566"
+        hostURL = "$protocol://$hostname:$port",
+        hostname = hostname,
+        port = port
     )
 }
 

@@ -22,7 +22,7 @@ fun Application.jwtAuthentication(configurations: SpoonConfiguration) {
             verifier(
                 JWT
                     .require(Algorithm.HMAC256(configurations.secret))
-                    .withIssuer(configurations.host)
+                    .withIssuer(configurations.hostURL)
                     .build()
             )
             validate { credential ->
@@ -49,7 +49,7 @@ suspend fun PipelineContext<Unit, ApplicationCall>.respondJWT(parent: Main) {
 
     val token = JWT.create()
         .withClaim("username", user.username)
-        .withIssuer(parent.configurations.host)
+        .withIssuer(parent.configurations.hostURL)
         .withExpiresAt(Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
         .sign(Algorithm.HMAC256(parent.configurations.secret))
     call.respond(hashMapOf("token" to token))
