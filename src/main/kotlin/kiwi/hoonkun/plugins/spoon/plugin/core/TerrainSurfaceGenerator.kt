@@ -30,8 +30,10 @@ class TerrainSurfaceGenerator {
             val isValidBlock: (Material) -> Boolean = { validKeys.contains(it.key.key) }
             val isValidNonWaterBlock: (Material) -> Boolean = { validKeys.contains(it.key.key) && it != Material.WATER }
 
+            val validMinY = if (world.environment == World.Environment.NORMAL) -64 else 0
+
             val getHighestValidBlock: (ChunkSnapshot, Int, Int, Int) -> Pair<Material, Int> = lambda@ { chunk, x, initialY, z ->
-                if (initialY < 0) return@lambda Material.AIR to -1
+                if (initialY < validMinY) return@lambda Material.AIR to -1
                 var resultType = chunk.getBlockType(x, initialY, z)
                 var resultY = initialY
                 while (!isValidBlock(resultType)) {
