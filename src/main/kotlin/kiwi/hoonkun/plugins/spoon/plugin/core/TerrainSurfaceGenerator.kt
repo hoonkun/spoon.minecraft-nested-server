@@ -15,6 +15,8 @@ class TerrainSurfaceGenerator {
     companion object {
 
         fun generate(parent: Main, world: World, scale: Int, center: TerrainRequestLocation, limit: Int?): TerrainResponse {
+            val validKeys = parent.resources.blockColors.keys
+
             val calcBitsPerBlock: (Int) -> Int = {
                 var result = 4
                 var value = 2 * 2 * 2 * 2
@@ -25,8 +27,8 @@ class TerrainSurfaceGenerator {
                 result
             }
 
-            val isValidBlock: (Material) -> Boolean = { (it.isSolid || it == Material.WATER || it == Material.LAVA) && !it.isAir }
-            val isValidNonWaterBlock: (Material) -> Boolean = { (it.isSolid || it == Material.LAVA) && !it.isAir && it != Material.WATER }
+            val isValidBlock: (Material) -> Boolean = { validKeys.contains(it.key.key) }
+            val isValidNonWaterBlock: (Material) -> Boolean = { validKeys.contains(it.key.key) && it != Material.WATER }
 
             val getHighestValidBlock: (ChunkSnapshot, Int, Int, Int) -> Pair<Material, Int> = lambda@ { chunk, x, initialY, z ->
                 if (initialY < 0) return@lambda Material.AIR to -1
