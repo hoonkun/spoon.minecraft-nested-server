@@ -78,6 +78,7 @@ class LiveDataType {
         const val PlayerGameMode = "PlayerGameMode"
         const val Terrain = "Terrain"
         const val CommandResponse = "CommandResponse"
+        const val PlayerInventory = "PlayerInventory"
     }
 }
 
@@ -116,6 +117,11 @@ data class TerrainSubscriptionData(val type: String, val terrain: TerrainRespons
 
 @Serializable
 data class RunCommandResponse(val type: String, val response: String)
+
+@Serializable
+data class PlayerItem(val key: String, val amount: Int)
+@Serializable
+data class PlayerInventoryData(val type: String, val playerId: String, val inventory: List<PlayerItem?>)
 
 fun Application.websocketServer(parent: Main) {
     install(WebSockets) {

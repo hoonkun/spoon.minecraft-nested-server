@@ -36,6 +36,7 @@ class LiveDataCache {
     val onPlayerHealth = mutableMapOf<String, Double>()
     val onPlayerExp = mutableMapOf<String, Pair<Int, Float>>()
     val onTerrain = mutableMapOf<TerrainRequest, TerrainResponse>()
+    val onPlayerInventory = mutableMapOf<String, List<Pair<String?, Int?>>>()
 }
 
 class LiveDataObserver(private val parent: Main): Listener {
@@ -47,21 +48,24 @@ class LiveDataObserver(private val parent: Main): Listener {
     private lateinit var heavyTimer: Timer
 
     private val defaultObservingThread = Thread {
-        defaultRapidTimer = fixedRateTimer(name = "default-rapid", period = 500) {
-            CoroutineScope(Dispatchers.Default).launch {
+        val threadScope = CoroutineScope(Dispatchers.Default + parent.job)
+        defaultRapidTimer = fixedRateTimer(name = "default-rapid", period = 100) {
+            threadScope.launch {
+                observeInventory()
                 observeHealth()
                 observeExp()
             }
         }
         defaultNormalTimer = fixedRateTimer(name = "default-normal", period = 5000) {
-            CoroutineScope(Dispatchers.Default).launch {
+            threadScope.launch {
                 observeTime()
             }
         }
     }
     private val heavyObservingThread = Thread {
+        val threadScope = CoroutineScope(Dispatchers.Default + parent.job)
         heavyTimer = fixedRateTimer(name = "heavy", period = 3000) {
-            CoroutineScope(Dispatchers.Default).launch {
+            threadScope.launch {
                 val responses = observeTerrain()
                 responses.forEach { (connection, response) ->
                     response?.let {
@@ -110,6 +114,25 @@ class LiveDataObserver(private val parent: Main): Listener {
                 .forEach { it.session.sendSerialized(PlayerExpData(LiveDataType.PlayerExp, playerId, player.level, player.exp)) }
 
             cache.onPlayerExp[playerId] = player.level to player.exp
+        }
+    }
+
+    private suspend fun observeInventory() {
+        parent.server.onlinePlayers.forEach { player ->
+            val playerId = player.playerProfile.uniqueId.toString()
+            val items = player.inventory.take(9).map { it?.type?.key?.key to it?.amount }
+            if (cache.onPlayerInventory[playerId] == items) return@forEach
+
+            val data = PlayerInventoryData(
+                LiveDataType.PlayerInventory,
+                playerId,
+                items.map { (key, amount) -> if (key != null && amount != null) PlayerItem(key, amount) else null }
+            )
+
+            parent.subscribers(LiveDataType.PlayerInventory)
+                .forEach { it.session.sendSerialized(data) }
+
+            cache.onPlayerInventory[playerId] = items
         }
     }
 
@@ -176,6 +199,19 @@ class LiveDataObserver(private val parent: Main): Listener {
                 }
         }
     }
+
+//    @EventHandler
+//    fun onInventoryClick(event: InventoryClickEvent) {
+//        println("inventory click")
+//        val inventory = event.clickedInventory
+//        if (inventory == null || inventory !is PlayerInventory) return
+//
+//        val hotbar = inventory.take(10).map { (it?.type ?: Material.AIR).key.key to (it?.amount ?: 0) }.toMutableList()
+//        if (event.slot < 10)
+//            hotbar[event.slot] = (event.cursor?.type ?: Material.AIR).key.key to (event.cursor?.amount ?: 0)
+//
+//        println("${hotbar.map { if (it.first == "air") null else "${it.first} x${it.second}" }}")
+//    }
 
     @EventHandler
     fun onPlayerLocation(event: PlayerMoveEvent) {
