@@ -51,9 +51,9 @@ class LiveDataObserver(private val parent: Main): Listener {
         val threadScope = CoroutineScope(Dispatchers.Default + parent.job)
         defaultRapidTimer = fixedRateTimer(name = "default-rapid", period = 100) {
             threadScope.launch {
-                observeInventory()
-                observeHealth()
-                observeExp()
+                if (parent.subscribers(LiveDataType.PlayerInventory).isNotEmpty()) observeInventory()
+                if (parent.subscribers(LiveDataType.PlayerHealth).isNotEmpty()) observeHealth()
+                if (parent.subscribers(LiveDataType.PlayerExp).isNotEmpty()) observeExp()
             }
         }
         defaultNormalTimer = fixedRateTimer(name = "default-normal", period = 5000) {
