@@ -21,7 +21,8 @@ repositories {
 dependencies {
     val ktor_version = "2.0.1"
 
-    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlin:kotlin-test:1.5.31")
+    testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
 
     implementation("org.spigotmc:spigot-api:1.19.4-R0.1-SNAPSHOT")
 
