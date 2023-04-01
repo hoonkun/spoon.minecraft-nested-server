@@ -1,4 +1,3 @@
-import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import org.bukkit.Material
@@ -54,12 +53,10 @@ class BlockColorGenerator: StringSpec() {
         }
 
         val isExceptional: Material.() -> Boolean = check@ {
-            exceptionalNames.find { this.name.contains(it) } != null || exactMatchExceptions.find { this.name == it } != null
+            exceptionalNames.any { this.name.contains(it) } || exactMatchExceptions.any { this.name == it }
         }
 
         "generate data.json" {
-            Color(255, 255, 255).hex.lowercase() shouldBe "#ffffffff"
-
             val textureFiles = texturesDir.listFiles()
             textureFiles shouldNotBe null
 
@@ -76,8 +73,8 @@ class BlockColorGenerator: StringSpec() {
             val validBlocks = Material.values()
                 .filter { (it.isBlock && it.isSolid && it.isOccluding && !it.isAir) || it.isExceptional() }
                 .filter { !it.name.contains("LEGACY") }
+                .sortedBy { it.name }
                 .toMutableList()
-            validBlocks.sortBy { it.name }
 
             val outputFile = File("$projectRoot/src/main/resources/block_colors.json")
             outputFile.writeBytes(

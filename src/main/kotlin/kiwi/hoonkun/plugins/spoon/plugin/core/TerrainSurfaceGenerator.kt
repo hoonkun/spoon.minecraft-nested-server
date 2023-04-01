@@ -1,5 +1,6 @@
 package kiwi.hoonkun.plugins.spoon.plugin.core
 
+import com.google.common.math.IntMath.pow
 import kiwi.hoonkun.plugins.spoon.Main
 import kiwi.hoonkun.plugins.spoon.extensions.forEach
 import kiwi.hoonkun.plugins.spoon.server.TerrainData
@@ -8,7 +9,7 @@ import kiwi.hoonkun.plugins.spoon.server.TerrainResponse
 import org.bukkit.ChunkSnapshot
 import org.bukkit.Material
 import org.bukkit.World
-import kotlin.math.absoluteValue
+import kotlin.math.floor
 
 class TerrainSurfaceGenerator {
 
@@ -19,11 +20,7 @@ class TerrainSurfaceGenerator {
 
             val calcBitsPerBlock: (Int) -> Int = {
                 var result = 4
-                var value = 2 * 2 * 2 * 2
-                while (it > value) {
-                    value *= 2
-                    result++
-                }
+                while (it > pow(2, result)) result++
                 result
             }
 
@@ -79,11 +76,11 @@ class TerrainSurfaceGenerator {
             val chunks = mutableMapOf<Pair<Int, Int>, ChunkSnapshot>()
 
             ((fromX until toX) to (fromZ until toZ)).forEach block@ { x, z ->
-                val chunkX = (x / 16).let { if (x >= 0) it else it - 1 }
-                val chunkZ = (z / 16).let { if (z >= 0) it else it - 1 }
+                val chunkX = floor(x.toFloat() / 16).toInt()
+                val chunkZ = floor(z.toFloat() / 16).toInt()
 
-                val blockX = (x % 16).absoluteValue.let { if (x < 0) 15 - it else it }
-                val blockZ = (z % 16).absoluteValue.let { if (z < 0) 15 - it else it }
+                val blockX = (x % 16).let { if (it < 0) 16 + it else it }
+                val blockZ = (z % 16).let { if (it < 0) 16 + it else it }
 
                 val chunk = chunks.getOrPut(chunkX to chunkZ) { world.getChunkAt(chunkX, chunkZ).chunkSnapshot }
 

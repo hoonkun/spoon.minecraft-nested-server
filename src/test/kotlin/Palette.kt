@@ -12,10 +12,10 @@ class Palette {
             return null
         }
 
-        val reader = iterator.next()
-        reader.input = stream
-
-        val image = reader.read(0)
+        val image = iterator.next().let {
+            it.input = stream
+            it.read(0)
+        }
 
         val width = image.width
         val height = image.height
